@@ -62,7 +62,7 @@ Les commandes PJLINK permettent d'effectuer des actions simples comme allumer ou
 - **Vérifier l'état du projecteur** : `%1POWR ?`
 
 Ces commandes peuvent être envoyées via Companion, Command Sender ou Hercules en utilisant le bon format.
-**Remarque:** Les fins de commandes peuvent être `<cr>`ou `\r`selon le logiciel utilisé.
+**Remarque:** Les fins de commandes peuvent être `<cr>` ou `\r` selon le logiciel utilisé.
 
 ### 3.2 Requêtes HTTP via Companion
 
