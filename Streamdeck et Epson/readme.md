@@ -57,9 +57,9 @@ Vérifiez que le port **4352** est utilisé pour les communications PJLINK, car 
 
 Les commandes PJLINK permettent d'effectuer des actions simples comme allumer ou éteindre le vidéoprojecteur. Voici quelques exemples :
 
-- **Allumer le projecteur** : `%1POWR 1<cr>`
-- **Éteindre le projecteur** : `%1POWR 0<cr>`
-- **Vérifier l'état du projecteur** : `%1POWR ?<cr>`
+- **Allumer le projecteur** : `%1POWR 1`
+- **Éteindre le projecteur** : `%1POWR 0`
+- **Vérifier l'état du projecteur** : `%1POWR ?`
 
 Ces commandes peuvent être envoyées via Companion, Command Sender ou Hercules en utilisant le bon format.
 
