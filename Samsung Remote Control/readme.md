@@ -81,7 +81,7 @@ Voici quelques commandes que vous pouvez envoyer :
   - Lors de la première connexion, un token d'authentification est généré et doit être validé sur l'écran. Ce token est ensuite sauvegardé dans un fichier `token.txt` pour les connexions futures.
   
 - **Envoi de commandes :**
-  - Une fois connecté, le script permet d'envoyer des commandes (telles que `KEY_POWER`, `KEY_VOLUMEUP`, etc.) à l'écran.
+  - Une fois connecté, le script permet d'envoyer des commandes (telles que `KEY_POWER`, `KEY_VOLUP`, etc.) à l'écran.
 
 ### `samsung_tv_info.py`
 
