@@ -1,4 +1,4 @@
-# README : Gestion des Presets pour la Caméra Sony BRC-Z700 via Stream Deck
+# README : Gestion des Presets pour la Caméra Sony BRC-Z700 via Stream Deck et remote RM-IP10 en simultané
 
 ## Introduction
 
