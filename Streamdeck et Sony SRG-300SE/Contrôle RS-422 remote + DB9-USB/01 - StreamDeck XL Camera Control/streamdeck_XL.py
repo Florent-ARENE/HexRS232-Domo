@@ -12,6 +12,9 @@ preset_camera_map = {}  # Associe chaque bouton de rappel à une caméra et un p
 camera_preset_count = {i: 1 for i in range(1, 9)}  # Compte les presets pour chaque caméra
 camera_presets = {i: [] for i in range(1, 9)}  # Liste des presets actifs pour chaque caméra
 
+# État du toggle pour l'enregistrement (False = désactivé, True = activé)
+recording_enabled = False
+
 # Fonction pour envoyer une commande série à la caméra
 def send_command(command, port='COM8', baudrate=38400):
     try:
@@ -37,7 +40,11 @@ def find_available_preset(camera):
 
 # Fonction pour enregistrer un preset
 def enregistrer_preset(button_number):
-    global camera_preset_count, camera_presets
+    global camera_preset_count, camera_presets, recording_enabled
+
+    if not recording_enabled:
+        print("Enregistrement de presets désactivé.")
+        return
 
     # Si un preset a déjà été enregistré sur ce bouton, on vérifie si c'est pour la même caméra
     if button_number + 8 in preset_camera_map:
@@ -83,7 +90,7 @@ def rappeler_preset(button_number):
     else:
         print(f"Aucun preset enregistré pour le bouton {button_number}.")
 
-# Fonction pour créer une image avec le numéro de la caméra
+# Fonction pour créer une image avec le numéro de la caméra ou l'état du toggle
 def create_camera_image(deck, number):
     image = Image.new("RGB", (48, 48), "black")
     draw = ImageDraw.Draw(image)
@@ -99,19 +106,47 @@ def create_camera_image(deck, number):
     draw.text(text_position, text, fill="white", font=font)
     return PILHelper.to_native_format(deck, image)
 
+# Fonction pour créer une image verte ou rouge pour le toggle
+def create_toggle_image(deck, is_enabled):
+    image = Image.new("RGB", (48, 48), "green" if is_enabled else "red")
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.load_default()
+
+    # Centrer le texte (On ou Off)
+    text = "On" if is_enabled else "Off"
+    text_bbox = draw.textbbox((0, 0), text, font=font)
+    text_width = text_bbox[2] - text_bbox[0]
+    text_height = text_bbox[3] - text_bbox[1]
+    text_position = ((image.width - text_width) // 2, (image.height - text_height) // 2)
+    
+    draw.text(text_position, text, fill="white", font=font)
+    return PILHelper.to_native_format(deck, image)
+
 # Fonction pour mettre à jour l'affichage du numéro de caméra sur le bouton 4
 def update_camera_display(deck):
     camera_image = create_camera_image(deck, camera_number)
     deck.set_key_image(4, camera_image)
 
+# Fonction pour mettre à jour l'affichage du bouton toggle sur le bouton 8
+def update_toggle_display(deck):
+    toggle_image = create_toggle_image(deck, recording_enabled)
+    deck.set_key_image(8, toggle_image)
+
 # Fonction appelée lorsqu'un bouton du Stream Deck est pressé ou relâché
 def handle_streamdeck_event(deck, key, state):
-    global camera_number
+    global camera_number, recording_enabled
     if state:  # Si le bouton est pressé
         print(f"Le bouton avec l'ID {key} a été pressé.")
         
+        # Bouton toggle sur le bouton 8
+        if key == 8:
+            recording_enabled = not recording_enabled
+            update_toggle_display(deck)
+            status = "activé" if recording_enabled else "désactivé"
+            print(f"Enregistrement de presets {status}.")
+        
         # Boutons pour changer le numéro de la caméra (flèches < et >)
-        if key == 3:  # Flèche <
+        elif key == 3:  # Flèche <
             camera_number = max(1, camera_number - 1)
             print(f"Sélection de la caméra {camera_number}")
             update_camera_display(deck)
@@ -142,8 +177,9 @@ if __name__ == "__main__":
     # Réduire la luminosité
     deck.set_brightness(30)
 
-    # Mise à jour initiale de l'affichage du numéro de caméra
+    # Mise à jour initiale de l'affichage du numéro de caméra et du toggle
     update_camera_display(deck)
+    update_toggle_display(deck)
 
     # Enregistrer la fonction de rappel pour les appuis et relâchements de touches
     deck.set_key_callback(handle_streamdeck_event)
