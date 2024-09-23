@@ -4,6 +4,8 @@
 
 Ce projet permet de contrôler plusieurs caméras (jusqu'à 8) à l'aide d'un Stream Deck XL et de commandes VISCA. Le script permet d'enregistrer et de rappeler des presets pour chaque caméra à partir du Stream Deck. Les utilisateurs peuvent changer de caméra, enregistrer des positions de preset et rappeler ces positions de manière intuitive via les boutons du Stream Deck.
 
+Script `streamdeck_XL.py` complet [ici](./streamdeck_XL.py).
+
 ## Fonctionnalités
 
 - **Sélection de la caméra active :**
@@ -42,6 +44,8 @@ pip install streamdeck pyserial Pillow
    - **Boutons 3 et 5** : Sélectionner la caméra active (affichage visuel sur le bouton 4).
    - **Boutons 9 à 15** : Enregistrer des presets pour la caméra sélectionnée.
    - **Boutons 17 à 23** : Rappeler les presets enregistrés pour la caméra sélectionnée.
+  
+![StreamDeckXL](./imgs/StreamDeckXL.png)
 
 ## Explications Techniques
 
