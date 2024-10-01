@@ -31,7 +31,7 @@ pip install StreamDeck pyserial Pillow PyATEMMax
 
 1. **Connectez le Stream Deck XL** et les caméras à votre ordinateur.
 2. **Connectez l'ATEM** pour gérer le Tally (adresse IP à configurer dans le script).
-3. **Lancez le script** `[streamdeck_XL.py](./streamdeck_XL.py)`.
+3. **Lancez le script** `streamdeck_XL.py` complet [ici](./streamdeck_XL.py).
 4. **Utilisez les boutons pour interagir** :
    - **Bouton 8** : Basculer entre le mode **STORE** et **RECALL**.
    - **Boutons 1 à 6, 9 à 14, 17 à 22, 25 à 30** : Enregistrer ou rappeler des presets selon le mode sélectionné.
