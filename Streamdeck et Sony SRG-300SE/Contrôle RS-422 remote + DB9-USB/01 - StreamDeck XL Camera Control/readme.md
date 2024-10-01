@@ -1,80 +1,78 @@
-# StreamDeck XL Camera Control
+# StreamDeck XL Camera Control avec gestion avancée des presets et Tally
 
 ## Introduction
 
-Ce projet permet de contrôler plusieurs caméras (jusqu'à 8) à l'aide d'un Stream Deck XL et de commandes VISCA. Le script permet d'enregistrer et de rappeler des presets pour chaque caméra à partir du Stream Deck. Les utilisateurs peuvent changer de caméra, enregistrer des positions de preset et rappeler ces positions de manière intuitive via les boutons du Stream Deck.
+Ce projet permet de contrôler jusqu'à **4 caméras** via un **Stream Deck XL**, en utilisant des commandes **VISCA** pour gérer et rappeler des presets pour chaque caméra. Il inclut également l'intégration d'un système **Tally** via un ATEM, permettant d'afficher sur le Stream Deck quelles caméras sont en **Program** (rouge) et en **Preview** (vert). 
 
-Script `streamdeck_XL.py` complet [ici](./streamdeck_XL.py).
+Le script prend en charge les modes **STORE** (enregistrement) et **RECALL** (rappel) des presets, avec un basculement simple entre les deux modes via un bouton **toggle**.
 
 ## Fonctionnalités
 
-- **Sélection de la caméra active :**
-  - Vous pouvez sélectionner la caméra active à l'aide des boutons de navigation `3` (pour diminuer le numéro) et `5` (pour l'augmenter). Les numéros de caméra vont de 1 à 8, et chaque sélection est accompagnée d'une mise à jour visuelle sur le Stream Deck.
-  
-- **Enregistrement des presets :**
-  - Les boutons `9` à `15` permettent d'enregistrer des presets pour la caméra actuellement sélectionnée. Si un preset est déjà associé à un bouton, il peut être écrasé ou supprimé pour une autre caméra. L'objectif est de garantir que chaque caméra dispose de ses propres presets, et que ces derniers soient logiquement organisés (sans trous dans la séquence).
-  - Le script gère intelligemment les "trous" dans les numéros de presets et tente toujours de combler les espaces vides avant de créer de nouveaux presets.
-
-- **Rappel des presets :**
-  - Les boutons `17` à `23` sont utilisés pour rappeler les presets associés à la caméra active. Si aucun preset n'est associé au bouton sélectionné, un message d'erreur est affiché.
-
-- **Gestion des presets inter-caméras :**
-  - Si vous enregistrez un preset sur un bouton déjà associé à une autre caméra, le preset est supprimé de l'ancienne caméra et remplacé par le nouveau preset pour la caméra actuelle. Cela permet d'assurer une gestion propre et efficace des presets sans chevauchement.
-
-## Dépendances
-
-Avant d'exécuter le script, vous devez installer les bibliothèques suivantes :
-
-- `streamdeck` : pour communiquer avec le Stream Deck.
-- `pyserial` : pour envoyer les commandes VISCA à la caméra.
-- `Pillow` : pour gérer les images affichées sur le Stream Deck.
-
-Vous pouvez les installer en exécutant la commande suivante :
-
-```bash
-pip install streamdeck pyserial Pillow
-```
+1. **Contrôle multi-caméras avec presets** : Contrôlez jusqu'à 4 caméras et gérez les presets pour chacune d’elles.
+2. **Modes STORE/RECALL** :
+   - **STORE** : Enregistrement de presets via les boutons 1 à 6, 9 à 14, 17 à 22, 25 à 30.
+   - **RECALL** : Rappel des presets via les mêmes boutons.
+   - **Toggle** via le bouton 8 pour basculer entre les modes.
+3. **Intégration Tally avec ATEM** : Les boutons 7, 15, 23, 31 affichent l'état **Program** (rouge) et **Preview** (vert) pour les caméras connectées à l'ATEM.
+4. **Sauvegarde rapide des presets** : Enregistrez les presets dans un fichier `save.conf` via le bouton 16, qui est chargé automatiquement au démarrage du script.
+5. **Verbose détaillé** : Le script affiche des messages dans la console pour chaque action (enregistrement/rappel de preset, changement de mode, etc.).
 
 ## Utilisation
 
-1. **Connectez votre Stream Deck XL** à votre ordinateur.
-2. **Connectez les caméras** que vous souhaitez contrôler via un port série (par défaut `COM8` est utilisé, mais cela peut être modifié dans le code).
-3. Lancez le script `streamdeck_XL.py`.
-4. Utilisez les boutons suivants pour interagir avec vos caméras :
-   - **Boutons 3 et 5** : Sélectionner la caméra active (affichage visuel sur le bouton 4).
-   - **Boutons 9 à 15** : Enregistrer des presets pour la caméra sélectionnée.
-   - **Boutons 17 à 23** : Rappeler les presets enregistrés pour la caméra sélectionnée.
-  
-![StreamDeckXL](./imgs/StreamDeckXL.png)
+### Pré-requis
 
-## Explications Techniques
+Installez les dépendances suivantes :
 
-- **Gestion des "trous" dans les presets** : Lorsqu'un preset est supprimé ou remplacé, le script garde une trace des numéros de preset disponibles pour chaque caméra. Cela garantit que les nouveaux presets comblent les "trous" avant d'incrémenter le numéro.
-  
-- **Écrasement de presets** : Si un preset est enregistré sur un bouton déjà utilisé pour une autre caméra, il est supprimé de la première caméra et enregistré pour la nouvelle. Cela assure une organisation efficace des presets.
-
-- **Interface visuelle** : Le bouton 4 du Stream Deck affiche toujours le numéro de la caméra sélectionnée pour une indication rapide et visuelle.
-
-## Exemple d'utilisation
-
-```
-Stream Deck prêt. Appuyez sur les boutons pour enregistrer/rappeler les presets et changer la caméra.
-Le bouton avec l'ID 9 a été pressé.
-Enregistrement du preset 1 pour la CAM 1
-Envoi de la commande : 8101043f0100ff
-Le bouton avec l'ID 9 a été relâché.
-Le bouton avec l'ID 17 a été pressé.
-Rappel du preset 1 pour la CAM 1
-Envoi de la commande : 8101043f0200ff
-Le bouton avec l'ID 17 a été relâché.
+```bash
+pip install StreamDeck pyserial Pillow PyATEMMax
 ```
 
-## Modifications Personnalisées
+### Étapes pour utiliser le script :
 
-Le script peut être facilement modifié pour s'adapter à d'autres configurations ou à un autre matériel. Par exemple :
-- **Changement du port série** : Modifiez la ligne `send_command(command, port='COM8')` pour utiliser un autre port.
-- **Modification des boutons de contrôle** : Vous pouvez ajuster les plages de boutons pour enregistrer/rappeler des presets ou pour changer la caméra active.
+1. **Connectez le Stream Deck XL** et les caméras à votre ordinateur.
+2. **Connectez l'ATEM** pour gérer le Tally (adresse IP à configurer dans le script).
+3. **Lancez le script** `streamdeck_XL.py`.
+4. **Utilisez les boutons pour interagir** :
+   - **Bouton 8** : Basculer entre le mode **STORE** et **RECALL**.
+   - **Boutons 1 à 6, 9 à 14, 17 à 22, 25 à 30** : Enregistrer ou rappeler des presets selon le mode sélectionné.
+   - **Boutons 7, 15, 23, 31** : Sélectionner la caméra en mode **STORE** et afficher l'état **Tally** en mode **RECALL**.
+   - **Bouton 16** : Sauvegarder la configuration actuelle dans `save.conf`.
+
+## Fonctionnement
+
+1. **Mode STORE** : Enregistrer des presets pour la caméra active. Si un preset existe déjà pour un bouton, il est écrasé.
+2. **Mode RECALL** : Rappeler les presets enregistrés pour la caméra active.
+3. **Sauvegarde et chargement** : Le fichier `save.conf` enregistre les presets pour chaque caméra. Il est chargé au démarrage du script pour restaurer les états précédents.
+
+## Fichier de configuration `save.conf`
+
+Exemple de configuration :
+
+```json
+{
+    "preset_camera_map": [
+        [1, [1, 1]],
+        [2, [2, 1]],
+        [3, [3, 1]],
+        [4, [4, 1]]
+    ],
+    "camera_preset_count": {
+        "1": 2,
+        "2": 2,
+        "3": 1,
+        "4": 1
+    }
+}
+```
+
+## Explications techniques
+
+- **Gestion des trous dans les presets** : Le script ajuste automatiquement les numéros de preset en comblant les trous laissés par les presets supprimés.
+- **Intégration Tally** : Utilisation de l'API **PyATEMMax** pour afficher l'état des caméras (rouge pour **Program**, vert pour **Preview**).
+- **Verbose détaillé** : Le script affiche chaque action (changement de mode, enregistrement/rappel de preset, sélection de caméra) dans la console pour un suivi en temps réel.
+
+---
 
 ## Remerciements
 
-Ce projet a été une étape importante dans l'automatisation du contrôle de caméra avec un Stream Deck. Merci à toutes les parties impliquées dans le test et le développement de cette solution.
+Merci à tous ceux qui ont contribué à ce projet pour en faire une solution complète et fiable pour le contrôle de caméras avec un **Stream Deck XL**.
