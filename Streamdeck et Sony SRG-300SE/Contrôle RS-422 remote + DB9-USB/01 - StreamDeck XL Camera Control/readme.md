@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Ce projet permet de contrôler jusqu'à **4 caméras** via un **Stream Deck XL**, en utilisant des commandes **VISCA** pour gérer et rappeler des presets pour chaque caméra. Il inclut également l'intégration d'un système **Tally** via un ATEM, permettant d'afficher sur le Stream Deck quelles caméras sont en **Program** (rouge) et en **Preview** (vert). 
+Ce projet permet de contrôler jusqu'à **4 caméras** via un **Stream Deck XL**, en utilisant des commandes **VISCA** pour gérer et rappeler des presets pour chaque caméra. Il inclut également l'intégration d'un système **Tally** via un ATEM, permettant d'afficher sur le Stream Deck quelles caméras sont en **Program** (rouge) et en **Preview** (vert).
 
 Le script prend en charge les modes **STORE** (enregistrement) et **RECALL** (rappel) des presets, avec un basculement simple entre les deux modes via un bouton **toggle**.
 
@@ -13,9 +13,9 @@ Le script prend en charge les modes **STORE** (enregistrement) et **RECALL** (ra
    - **STORE** : Enregistrement de presets via les boutons 1 à 6, 9 à 14, 17 à 22, 25 à 30.
    - **RECALL** : Rappel des presets via les mêmes boutons.
    - **Toggle** via le bouton 8 pour basculer entre les modes.
-3. **Intégration Tally avec ATEM** : Les boutons 7, 15, 23, 31 affichent l'état **Program** (rouge) et **Preview** (vert) pour les caméras connectées à l'ATEM.
+3. **Intégration Tally avec ATEM** : Les boutons 7, 15, 23, 31 affichent l'état **Program** (rouge) et **Preview** (vert) pour les caméras connectées à l'ATEM. Le Tally est mis à jour automatiquement en mode RECALL.
 4. **Sauvegarde rapide des presets** : Enregistrez les presets dans un fichier `save.conf` via le bouton 16, qui est chargé automatiquement au démarrage du script.
-5. **Verbose détaillé** : Le script affiche des messages dans la console pour chaque action (enregistrement/rappel de preset, changement de mode, etc.).
+5. **Verbose détaillé** : Le script affiche des messages dans la console pour chaque action (enregistrement/rappel de preset, changement de mode, etc.). Les logs incluent aussi la gestion des erreurs (commandes série, configuration).
 
 ## Utilisation
 
@@ -40,9 +40,10 @@ pip install StreamDeck pyserial Pillow PyATEMMax
 
 ## Fonctionnement
 
-1. **Mode STORE** : Enregistrer des presets pour la caméra active. Si un preset existe déjà pour un bouton, il est écrasé.
-2. **Mode RECALL** : Rappeler les presets enregistrés pour la caméra active.
+1. **Mode STORE** : Enregistrer des presets pour la caméra active. Si un preset existe déjà pour un bouton, il est écrasé. Avant suppression, une vérification est effectuée pour s'assurer que le preset existe bien.
+2. **Mode RECALL** : Rappeler les presets enregistrés pour la caméra active. Si un preset n'existe pas pour une caméra donnée, une erreur est loggée dans le verbose.
 3. **Sauvegarde et chargement** : Le fichier `save.conf` enregistre les presets pour chaque caméra. Il est chargé au démarrage du script pour restaurer les états précédents.
+4. **Gestion du Tally** : En mode RECALL, le Tally est mis à jour pour afficher les caméras actuellement en **Program** et **Preview** sur l'ATEM.
 
 ## Fichier de configuration `save.conf`
 
