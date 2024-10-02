@@ -63,10 +63,8 @@ def adjust_camera_preset_count():
     global camera_preset_count, camera_presets
     for camera in camera_presets:
         if camera_presets[camera]:
-            # Ajuste le compteur de presets à un au-dessus du dernier preset enregistré
             camera_preset_count[camera] = max(camera_presets[camera]) + 1
         else:
-            # Si aucun preset n'existe pour la caméra, on démarre à 1
             camera_preset_count[camera] = 1
 
 # Fonction pour enregistrer un preset
