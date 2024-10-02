@@ -1,4 +1,4 @@
-# camera.py
+## camera.py
 import serial
 import time
 from display import create_button_image
