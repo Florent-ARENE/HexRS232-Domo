@@ -38,6 +38,12 @@ pip install StreamDeck pyserial Pillow PyATEMMax
    - **Boutons 7, 15, 23, 31** : Sélectionner la caméra en mode **STORE** et afficher l'état **Tally** en mode **RECALL**.
    - **Bouton 16** : Sauvegarder la configuration actuelle dans `save.conf`.
 
+### Mode RECALL
+![Mode RECALL](./imgs/recall.png)
+
+### Mode STORE
+![Mode STORE](./imgs/store.png)
+
 ## Fonctionnement
 
 1. **Mode STORE** : Enregistrer des presets pour la caméra active. Si un preset existe déjà pour un bouton, il est écrasé. Avant suppression, une vérification est effectuée pour s'assurer que le preset existe bien.
