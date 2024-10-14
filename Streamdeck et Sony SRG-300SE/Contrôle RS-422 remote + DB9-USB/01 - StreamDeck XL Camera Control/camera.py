@@ -1,7 +1,6 @@
 ## camera.py
 import serial
 import time
-from display import create_button_image
 
 def send_command(command, port='COM8', baudrate=38400):
     try:
@@ -17,13 +16,12 @@ def send_command(command, port='COM8', baudrate=38400):
     except serial.SerialException as e:
         print(f"Erreur de communication série : {e}")
 
-def select_camera(deck, key=None):
-    global camera_number
+def recall_preset_for_camera(camera_number, preset_number):
+    # Commande VISCA pour rappeler un preset donné pour une caméra spécifique
+    command_preset = b'\x81\x01\x04\x3F\x02' + preset_number.to_bytes(1, 'big') + b'\xFF'
+    send_command(command_preset)
+    print(f"Rappel du preset {preset_number} pour la caméra {camera_number}")
 
-    if key:
-        camera_number = [7, 15, 23, 31].index(key) + 1
-        print(f"Caméra sélectionnée : {camera_number}")
-
-    for button, camera in zip([7, 15, 23, 31], range(1, 5)):
-        color = "blue" if camera == camera_number else "black"
-        deck.set_key_image(button, create_button_image(deck, f"Cam {camera}", color))
+def pause_for_camera_movement():
+    time.sleep(1.5)
+    print("Pause de 1,5 seconde")

@@ -2,9 +2,9 @@
 
 ## Introduction
 
-Ce projet permet de contrôler jusqu'à **4 caméras** via un **Stream Deck XL**, en utilisant des commandes **VISCA** pour gérer et rappeler des presets pour chaque caméra. Il inclut également l'intégration d'un système **Tally** via un ATEM, permettant d'afficher sur le Stream Deck quelles caméras sont en **Program** (rouge) et en **Preview** (vert).
+Ce projet permet de contrôler jusqu'à **4 caméras Sony BRC-Z700** via un **Stream Deck XL**, en utilisant des commandes **VISCA** pour gérer et rappeler des presets pour chaque caméra. Il inclut également l'intégration d'un système **Tally** via un **ATEM**, permettant d'afficher sur le **Stream Deck** quelles caméras sont en **Program** (rouge) et en **Preview** (vert).
 
-Le script prend en charge les modes **STORE** (enregistrement) et **RECALL** (rappel) des presets, avec un basculement simple entre les deux modes via un bouton **toggle**.
+Le projet prend en charge les modes **STORE** (enregistrement) et **RECALL** (rappel) des presets, avec un basculement simple entre ces deux modes via un bouton **toggle**.
 
 ## Fonctionnalités
 
@@ -17,51 +17,77 @@ Le script prend en charge les modes **STORE** (enregistrement) et **RECALL** (ra
 4. **Sauvegarde rapide des presets** : Enregistrez les presets dans un fichier `save.conf` via le bouton 16, qui est chargé automatiquement au démarrage du script.
 5. **Verbose détaillé** : Le script affiche des messages dans la console pour chaque action (enregistrement/rappel de preset, changement de mode, etc.). Les logs incluent aussi la gestion des erreurs (commandes série, configuration).
 
-## Utilisation
+## Prérequis
 
-### Pré-requis
+### Matériel requis :
 
-Installez les dépendances suivantes :
+- **Caméra Sony BRC-Z700**
+- **Stream Deck XL** avec **32 boutons**
+- **Adaptateur DB9/USB** pour connecter la caméra à votre PC
+- **DSD TECH SH-G01B Isolateur USB** (pour éviter les interférences entre la télécommande RM-IP10 et l'ordinateur)
+- **Python 3.x** installé sur votre ordinateur
+
+### Installation des Dépendances
+
+Installez les bibliothèques nécessaires via **pip** :
 
 ```bash
-pip install StreamDeck pyserial Pillow PyATEMMax
+pip install StreamDeck hidapi pyserial Pillow PyATEMMax
 ```
+
+### Gestion des dépendances HIDAPI sur Windows
+
+Si vous rencontrez des erreurs avec **hidapi**, suivez les étapes ci-dessous pour ajouter manuellement les fichiers **DLL** :
+
+1. Téléchargez le fichier `hidapi.dll` depuis [hidapi releases](https://github.com/libusb/hidapi/releases).
+2. Placez le fichier dans **C:\Windows\System32** (pour les systèmes 64-bit) ou **C:\Windows\SysWOW64** (pour les systèmes 32-bit).
+
+## Utilisation
 
 ### Étapes pour utiliser le script :
 
 1. **Connectez le Stream Deck XL** et les caméras à votre ordinateur.
 2. **Connectez l'ATEM** pour gérer le Tally (adresse IP à configurer dans le script).
-3. **Lancez le script** `streamdeck_XL.py` complet [ici](./streamdeck_XL.py).
+3. **Lancez le script** `streamdeck_XL.py`.
 4. **Utilisez les boutons pour interagir** :
    - **Bouton 8** : Basculer entre le mode **STORE** et **RECALL**.
    - **Boutons 1 à 6, 9 à 14, 17 à 22, 25 à 30** : Enregistrer ou rappeler des presets selon le mode sélectionné.
    - **Boutons 7, 15, 23, 31** : Sélectionner la caméra en mode **STORE** et afficher l'état **Tally** en mode **RECALL**.
    - **Bouton 16** : Sauvegarder la configuration actuelle dans `save.conf`.
 
-### Mode RECALL
-![Mode RECALL](./imgs/recall.png)
+## Commandes VISCA pour la Caméra BRC-Z700
 
-### Mode STORE
-![Mode STORE](./imgs/store.png)
+Les **commandes VISCA** permettent de contrôler la caméra via une connexion série.
+
+### Enregistrement de preset
+
+- **Enregistrer preset 1** : `81 01 04 3F 01 00 FF`
+- **Enregistrer preset 2** : `81 01 04 3F 01 01 FF`
+
+### Rappel de preset
+
+- **Rappeler preset 1** : `81 01 04 3F 02 00 FF`
+- **Rappeler preset 2** : `81 01 04 3F 02 01 FF`
 
 ## Fonctionnement
 
-1. **Mode STORE** : Enregistrer des presets pour la caméra active. Si un preset existe déjà pour un bouton, il est écrasé. Avant suppression, une vérification est effectuée pour s'assurer que le preset existe bien.
-2. **Mode RECALL** : Rappeler les presets enregistrés pour la caméra active. Si un preset n'existe pas pour une caméra donnée, une erreur est loggée dans le verbose.
-3. **Sauvegarde et chargement** : Le fichier `save.conf` enregistre les presets pour chaque caméra. Il est chargé au démarrage du script pour restaurer les états précédents.
-4. **Gestion du Tally** : En mode RECALL, le Tally est mis à jour pour afficher les caméras actuellement en **Program** et **Preview** sur l'ATEM.
+1. **Mode STORE** : Enregistrer des presets pour la caméra active. Si un preset existe déjà pour un bouton, il est écrasé.
+2. **Mode RECALL** : Rappeler les presets enregistrés. Si un preset n'existe pas, une erreur est loggée.
+3. **Gestion du Tally** : En mode RECALL, le Tally affiche les caméras en **Program** et **Preview** via l'ATEM.
 
-## Fichier de configuration `save.conf`
+## Sauvegarde et Chargement de la Configuration
 
-Exemple de configuration :
+Le fichier `save.conf` enregistre les presets pour chaque caméra et est chargé automatiquement au démarrage du script.
+
+Exemple de fichier `save.conf` :
 
 ```json
 {
     "preset_camera_map": [
-        [1, [1, 1]],
-        [2, [2, 1]],
-        [3, [3, 1]],
-        [4, [4, 1]]
+        [1, 1],
+        [2, 2],
+        [3, 1],
+        [4, 1]
     ],
     "camera_preset_count": {
         "1": 2,
@@ -72,41 +98,19 @@ Exemple de configuration :
 }
 ```
 
-## Explications techniques
-
-- **Gestion des trous dans les presets** : Le script ajuste automatiquement les numéros de preset en comblant les trous laissés par les presets supprimés.
-- **Intégration Tally** : Utilisation de l'API **PyATEMMax** pour afficher l'état des caméras (rouge pour **Program**, vert pour **Preview**).
-- **Verbose détaillé** : Le script affiche chaque action (changement de mode, enregistrement/rappel de preset, sélection de caméra) dans la console pour un suivi en temps réel.
-
 ## Arborescence des fichiers
 
 Le projet est structuré comme suit :
 
 ```
-📂 **StreamDeck XL Camera Control**
+📂 StreamDeck XL Camera Control
 │
-│
-├── 📜 **streamdeck_XL.py**         # Fichier principal (main) du script, gère l'initialisation
-│                                    des modules et le fonctionnement global
-│
-├── 📜 **streamdeck.py**            # Gestion spécifique du Stream Deck : affichage, boutons,
-│                                    événements et basculement entre les modes STORE/RECALL
-│
-├── 📜 **presets.py**               # Gestion des presets pour chaque caméra (enregistrement,
-│                                    rappel, sauvegarde, chargement)
-│
-├── 📜 **camera.py**                # Gestion des commandes série VISCA pour contrôler les caméras
-│
-├── 📜 **tally.py**                 # Gestion de l'intégration Tally via l'ATEM (Program/Preview)
-│
-├── 📜 **atem.py**                  # Connexion et gestion de la communication avec l'ATEM
-│
-└── 📜 **display.py**               # Création des images pour les boutons du Stream Deck
+├── 📜 streamdeck_XL.py         # Fichier principal du script
+├── 📜 streamdeck.py            # Gestion du Stream Deck
+├── 📜 presets.py               # Gestion des presets (enregistrement, rappel, sauvegarde)
+├── 📜 sequences.py             # Gestion des séquences (enregistrement, rappel, sauvegarde)
+├── 📜 camera.py                # Commandes série VISCA
+├── 📜 tally.py                 # Intégration Tally via ATEM
+├── 📜 atem.py                  # Connexion à l'ATEM
+└── 📜 display.py               # Création des images pour les boutons
 ```
-
-Cette arborescence décrit la structure du projet et les responsabilités de chaque fichier. Les images dans le dossier **imgs** illustrent les différents modes du Stream Deck (STORE/RECALL) pour la documentation.
-
-
-## Remerciements
-
-Merci à tous ceux qui ont contribué à ce projet pour en faire une solution complète et fiable pour le contrôle de caméras avec un **Stream Deck XL**.

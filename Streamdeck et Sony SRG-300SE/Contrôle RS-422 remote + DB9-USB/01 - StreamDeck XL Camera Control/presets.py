@@ -3,6 +3,7 @@ import json
 import os
 from display import create_button_image
 from camera import send_command
+from sequences import sequence_actions  # Importation de la fonction de séquence depuis sequences.py
 
 preset_camera_map = {}
 camera_preset_count = {i: 1 for i in range(1, 5)}
@@ -74,6 +75,8 @@ def enregistrer_preset(deck, key, camera_number, recording_enabled):
     deck.set_key_image(16, create_button_image(deck, "Save", "orange"))
 
 
+from sequences import sequence_actions  # Importer la fonction de séquence depuis sequences.py
+
 # Fonction pour rappeler un preset
 def rappeler_preset(deck, button_number):
     if button_number in preset_camera_map:
@@ -81,12 +84,15 @@ def rappeler_preset(deck, button_number):
         
         if preset_number in camera_presets[camera_to_use]:
             print(f"Rappel du preset {preset_number} pour la caméra {camera_to_use}.")
-            command = bytes([0x80 + camera_to_use, 0x01, 0x04, 0x3F, 0x02, preset_number - 1, 0xFF])
-            send_command(command)
+            
+            # Appel de la séquence avec le couple caméra + preset
+            sequence_actions(camera_to_use, preset_number)
+            
         else:
             print(f"Erreur : le preset {preset_number} n'existe pas pour la caméra {camera_to_use}.")
     else:
         print(f"Aucun preset enregistré pour le bouton {button_number}.")
+
 
 # Fonction pour sauvegarder la configuration
 def save_configuration(deck):
@@ -104,10 +110,11 @@ def save_configuration(deck):
         print(f"Erreur lors de la sauvegarde : {e}")
         deck.set_key_image(16, create_button_image(deck, "Save", "red"))
 
+
 # Fonction pour charger la configuration
 def load_configuration(deck):
     global preset_camera_map, camera_preset_count, camera_presets
-
+    
     if os.path.exists("save.conf"):
         with open("save.conf", "r") as config_file:
             config_data = json.load(config_file)
@@ -119,6 +126,8 @@ def load_configuration(deck):
                 camera_presets[camera].append(preset)
 
         print("Configuration chargée depuis save.conf... OK")
+        # print("Données chargées depuis save.conf : ", preset_camera_map, camera_preset_count)
+
         adjust_camera_preset_count()
         deck.set_key_image(16, create_button_image(deck, "Save", "green"))
     else:
