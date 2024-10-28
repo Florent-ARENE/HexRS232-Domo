@@ -25,64 +25,47 @@ def find_available_preset(camera):
     return camera_preset_count[camera]
 
 def enregistrer_preset(deck, key, camera_number, recording_enabled):
-    global camera_preset_count, camera_presets, config_changed, preset_camera_map
-
     real_key = get_real_button_number(current_page, key)
 
     if not recording_enabled:
         print("L'enregistrement des presets est désactivé.")
         return
 
+    # Gestion de la suppression et de l'écrasement des presets existants
     if real_key in preset_camera_map:
         old_camera, old_preset = preset_camera_map[real_key]
         
         if old_preset in camera_presets[old_camera]:
-            print(f"Suppression du preset {old_preset} pour la caméra {old_camera}.")
             camera_presets[old_camera].remove(old_preset)
+            print(f"Suppression du preset {old_preset} pour la caméra {old_camera}.")
         
-        # Écrasement du même preset pour la même caméra
-        if old_camera == camera_number:
-            preset_number = old_preset
-            print(f"Écrasement du preset {preset_number} pour la caméra {camera_number}.")
-        else:
-            # Nouveau preset pour une autre caméra
-            preset_number = find_available_preset(camera_number)
-            print(f"Enregistrement du nouveau preset {preset_number} pour la caméra {camera_number}.")
-            camera_presets[camera_number].append(preset_number)
+        # Si on écrase le même preset pour la même caméra, on garde le numéro
+        preset_number = old_preset if old_camera == camera_number else find_available_preset(camera_number)
     else:
-        # Si aucun preset n'est associé à ce bouton, on enregistre un nouveau preset
+        # Sinon, on enregistre un nouveau preset
         preset_number = find_available_preset(camera_number)
-        print(f"Enregistrement du preset {preset_number} pour la caméra {camera_number}.")
-        camera_presets[camera_number].append(preset_number)
 
-    # Envoi de la commande VISCA pour enregistrer le preset
+    # Ajout du preset au dictionnaire et envoi de la commande
+    camera_presets[camera_number].append(preset_number)
     command = bytes([0x80 + camera_number, 0x01, 0x04, 0x3F, 0x01, preset_number - 1, 0xFF])
     send_command(command)
-
-    # Mise à jour de la map des presets
     preset_camera_map[real_key] = (camera_number, preset_number)
-    config_changed = True
 
-    # Incrémenter le compteur de presets si un nouveau preset est ajouté
-    if preset_number == camera_preset_count[camera_number]:
-        camera_preset_count[camera_number] += 1
-
-    # Indiquer que la configuration a changé
-    deck.set_key_image(16, create_button_image(deck, "Save", "orange"))
+    on_preset_changed(deck)
     print(f"Enregistrement du preset {preset_number} pour la caméra {camera_number} sur le bouton {key}.")
+
+    # Mise à jour de camera_preset_count si nécessaire
+    if preset_number >= camera_preset_count[camera_number]:
+        camera_preset_count[camera_number] = preset_number + 1
 
 def rappeler_preset(deck, key):
     real_key = get_real_button_number(current_page, key)
 
     if real_key in preset_camera_map:
         camera_to_use, preset_number = preset_camera_map[real_key]
-        
         if preset_number in camera_presets[camera_to_use]:
-            print(f"Rappel du preset {preset_number} pour la caméra {camera_to_use}.")
-            
-            # Appel de la séquence avec le couple caméra + preset
             sequence_actions(camera_to_use, preset_number)
-            
+            print(f"Rappel du preset {preset_number} pour la caméra {camera_to_use} depuis le bouton {key}.")
         else:
             print(f"Erreur : le preset {preset_number} n'existe pas pour la caméra {camera_to_use}.")
     else:
