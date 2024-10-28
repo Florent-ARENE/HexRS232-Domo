@@ -17,6 +17,18 @@ Le projet prend en charge les modes **STORE** (enregistrement) et **RECALL** (ra
 4. **Sauvegarde rapide des presets** : Enregistrez les presets dans un fichier `save.conf` via le bouton 16, qui est chargé automatiquement au démarrage du script.
 5. **Verbose détaillé** : Le script affiche des messages dans la console pour chaque action (enregistrement/rappel de preset, changement de mode, etc.). Les logs incluent aussi la gestion des erreurs (commandes série, configuration).
 
+## Aperçu des Modes
+
+### Mode RECALL
+En mode **RECALL**, le bouton **SAVE** est vert si toutes les configurations sont sauvegardées. Les boutons Caméras (7, 15, 23, 31) indiquent l'état **Program** (rouge) ou **Preview** (vert) pour les caméras connectées.
+
+![Mode RECALL](imgs/recall.png)
+
+### Mode STORE
+En mode **STORE**, le bouton **SAVE** devient orange dès qu'un changement non sauvegardé est détecté. Les caméras sont sélectionnables avec des boutons en bleu pour l'affichage actif.
+
+![Mode STORE](imgs/store.png)
+
 ## Prérequis
 
 ### Matériel requis :
