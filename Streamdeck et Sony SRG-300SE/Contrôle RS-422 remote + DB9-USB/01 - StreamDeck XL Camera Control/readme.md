@@ -39,7 +39,27 @@ En mode **STORE**, le bouton **SAVE** devient orange dès qu'un changement non s
 - **DSD TECH SH-G01B Isolateur USB** (pour éviter les interférences entre la télécommande RM-IP10 et l'ordinateur)
 - **Python 3.x** installé sur votre ordinateur
 
-### Installation des Dépendances
+### Installation de Python et des Dépendances
+
+#### Étapes d'installation de Python :
+
+1. **Téléchargez Python** depuis [python.org](https://www.python.org/downloads/).
+2. **Installez Python** en cochant la case "Add Python to PATH" (Ajouter Python au PATH).
+3. **Vérifiez l'installation** en ouvrant un terminal (ou PowerShell sur Windows) et en exécutant :
+   ```bash
+   python --version
+   ```
+   Vous devriez voir la version de Python installée.
+
+#### Ajout de Python aux variables d'environnement
+
+Si Python n’est pas trouvé dans votre PATH après l’installation :
+
+1. **Ouvrez les Paramètres Système Avancés** sur Windows.
+2. **Cliquez sur Variables d’environnement**.
+3. **Ajoutez un nouveau chemin** vers le dossier d’installation de Python (exemple : `C:\Python39`) dans la variable PATH.
+
+#### Installation des dépendances Python
 
 Installez les bibliothèques nécessaires via **pip** :
 
@@ -66,6 +86,13 @@ Si vous rencontrez des erreurs avec **hidapi**, suivez les étapes ci-dessous po
    - **Boutons 1 à 6, 9 à 14, 17 à 22, 25 à 30** : Enregistrer ou rappeler des presets selon le mode sélectionné.
    - **Boutons 7, 15, 23, 31** : Sélectionner la caméra en mode **STORE** et afficher l'état **Tally** en mode **RECALL**.
    - **Bouton 16** : Sauvegarder la configuration actuelle dans `save.conf`.
+
+### Gestion des pages de boutons
+
+Ce script gère plusieurs pages de boutons sur le Stream Deck XL, permettant d’assigner différents presets selon la page active :
+
+1. **Navigation multi-page** : En appuyant sur les boutons de navigation du Stream Deck XL, vous pouvez passer entre les pages de boutons, chaque page étant configurée de manière indépendante.
+2. **Enregistrement et rappel des presets par page** : Les boutons de preset fonctionnent en fonction de la page active, assurant ainsi une gestion multi-page des configurations de preset.
 
 ## Commandes VISCA pour la Caméra BRC-Z700
 
