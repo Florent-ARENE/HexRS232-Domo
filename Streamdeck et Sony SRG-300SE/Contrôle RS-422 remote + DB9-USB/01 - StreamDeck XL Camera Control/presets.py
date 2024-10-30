@@ -8,27 +8,32 @@ from sequences import sequence_actions
 preset_camera_map = {}
 camera_preset_count = {i: 1 for i in range(1, 5)}
 camera_presets = {i: [] for i in range(1, 5)}
-config_changed = False  # Start as False, set True on preset creation
-current_page = 1  # Page actuelle
+config_changed = False
+current_page = 1
 
-# Fonction pour ajuster le numéro du bouton en fonction de la page
 def get_real_button_number(button_number):
     return (current_page - 1) * 32 + button_number + 1
 
-# Mettre à jour la page actuelle depuis streamdeck_XL.py
 def set_current_page(page):
     global current_page
     current_page = page
 
-# Fonction pour trouver un preset disponible
 def find_available_preset(camera):
-    for i in range(1, camera_preset_count[camera]):
-        if i not in camera_presets[camera]:
+    """
+    Finds the next available preset number for a specific camera to ensure uniqueness.
+    """
+    existing_presets = set(camera_presets[camera])
+    for i in range(1, camera_preset_count[camera] + 1):
+        if i not in existing_presets:
             return i
     return camera_preset_count[camera]
 
 def enregistrer_preset(deck, key, camera_number, recording_enabled, page):
-    set_current_page(page)  # Assure la synchronisation de la page
+    """
+    Register a preset, ensuring uniqueness and handling overwrites.
+    """
+    global config_changed
+    set_current_page(page)
     real_key = get_real_button_number(key)
 
     if not recording_enabled:
@@ -44,15 +49,24 @@ def enregistrer_preset(deck, key, camera_number, recording_enabled, page):
     else:
         preset_number = find_available_preset(camera_number)
 
-    camera_presets[camera_number].append(preset_number)
+    # Ensure preset number is added to the list and increment if it's a new highest preset
+    if preset_number not in camera_presets[camera_number]:
+        camera_presets[camera_number].append(preset_number)
+    if preset_number >= camera_preset_count[camera_number]:
+        camera_preset_count[camera_number] = preset_number + 1
+
     command = bytes([0x80 + camera_number, 0x01, 0x04, 0x3F, 0x01, preset_number - 1, 0xFF])
     send_command(command)
     preset_camera_map[real_key] = (camera_number, preset_number)
-    on_preset_changed(deck)
+    config_changed = True
+    update_save_button(deck, config_changed)
     print(f"Enregistrement du preset {preset_number} pour la caméra {camera_number} sur le bouton {key}.")
 
 def rappeler_preset(deck, key, page):
-    set_current_page(page)  # Assure la synchronisation de la page
+    """
+    Recall a preset based on the button key and page.
+    """
+    set_current_page(page)
     real_key = get_real_button_number(key)
 
     if real_key in preset_camera_map:
@@ -66,7 +80,7 @@ def rappeler_preset(deck, key, page):
         print(f"Aucun preset enregistré pour le bouton {real_key}.")
 
 def save_configuration(deck):
-    global preset_camera_map, camera_preset_count, config_changed
+    global config_changed
     config_data = {
         'preset_camera_map': list(preset_camera_map.items()),
         'camera_preset_count': camera_preset_count
@@ -74,7 +88,7 @@ def save_configuration(deck):
     try:
         with open("save.conf", "w") as config_file:
             json.dump(config_data, config_file)
-        config_changed = False  # Reset after save
+        config_changed = False
         update_save_button(deck, config_changed)
         print("Configuration sauvegardée dans save.conf.")
     except Exception as e:
@@ -95,12 +109,12 @@ def load_configuration(deck):
                 camera_presets[camera].append(preset)
 
         adjust_camera_preset_count()
+        update_save_button(deck, config_changed=False)
         print("Configuration chargée depuis save.conf.")
-        update_save_button(deck, config_changed=False)  # Start as green if config is saved
         return True
     else:
+        update_save_button(deck, config_changed=True)
         print("Aucune configuration trouvée.")
-        update_save_button(deck, config_changed=True)  # Start as orange if config needs saving
         return False
 
 def adjust_camera_preset_count():
@@ -109,8 +123,3 @@ def adjust_camera_preset_count():
             camera_preset_count[camera] = max(camera_presets[camera]) + 1
         else:
             camera_preset_count[camera] = 1
-
-def on_preset_changed(deck):
-    global config_changed
-    config_changed = True
-    update_save_button(deck, config_changed)  # Show orange for unsaved changes
