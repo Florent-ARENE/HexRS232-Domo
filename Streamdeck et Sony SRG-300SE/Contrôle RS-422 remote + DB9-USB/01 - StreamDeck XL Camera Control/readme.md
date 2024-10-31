@@ -39,27 +39,7 @@ En mode **STORE**, le bouton **SAVE** devient orange dès qu'un changement non s
 - **DSD TECH SH-G01B Isolateur USB** (pour éviter les interférences entre la télécommande RM-IP10 et l'ordinateur)
 - **Python 3.x** installé sur votre ordinateur
 
-### Installation de Python et des Dépendances
-
-#### Étapes d'installation de Python :
-
-1. **Téléchargez Python** depuis [python.org](https://www.python.org/downloads/).
-2. **Installez Python** en cochant la case "Add Python to PATH" (Ajouter Python au PATH).
-3. **Vérifiez l'installation** en ouvrant un terminal (ou PowerShell sur Windows) et en exécutant :
-   ```bash
-   python --version
-   ```
-   Vous devriez voir la version de Python installée.
-
-#### Ajout de Python aux variables d'environnement
-
-Si Python n’est pas trouvé dans votre PATH après l’installation :
-
-1. **Ouvrez les Paramètres Système Avancés** sur Windows.
-2. **Cliquez sur Variables d’environnement**.
-3. **Ajoutez un nouveau chemin** vers le dossier d’installation de Python (exemple : `C:\Python39`) dans la variable PATH.
-
-#### Installation des dépendances Python
+### Installation des Dépendances
 
 Installez les bibliothèques nécessaires via **pip** :
 
@@ -86,13 +66,6 @@ Si vous rencontrez des erreurs avec **hidapi**, suivez les étapes ci-dessous po
    - **Boutons 1 à 6, 9 à 14, 17 à 22, 25 à 30** : Enregistrer ou rappeler des presets selon le mode sélectionné.
    - **Boutons 7, 15, 23, 31** : Sélectionner la caméra en mode **STORE** et afficher l'état **Tally** en mode **RECALL**.
    - **Bouton 16** : Sauvegarder la configuration actuelle dans `save.conf`.
-
-### Gestion des pages de boutons
-
-Ce script gère plusieurs pages de boutons sur le Stream Deck XL, permettant d’assigner différents presets selon la page active :
-
-1. **Navigation multi-page** : En appuyant sur les boutons de navigation du Stream Deck XL, vous pouvez passer entre les pages de boutons, chaque page étant configurée de manière indépendante.
-2. **Enregistrement et rappel des presets par page** : Les boutons de preset fonctionnent en fonction de la page active, assurant ainsi une gestion multi-page des configurations de preset.
 
 ## Commandes VISCA pour la Caméra BRC-Z700
 
@@ -137,7 +110,77 @@ Exemple de fichier `save.conf` :
 }
 ```
 
-## Arborescence des fichiers
+## Description détaillée des fichiers
+
+#### 1. **streamdeck_XL.py** (fichier principal)
+   - **Rôle** : Initialise l'interface avec le Stream Deck et définit la logique de basculement entre les modes "STORE" et "RECALL". Gère les boutons et le rappel/sauvegarde des presets.
+   - **Fonctions clés** :
+     - `update_display(deck)`: Gère l'interface en fonction du mode sélectionné (STORE ou RECALL).
+     - `change_page()`: Permet de naviguer entre les pages du Stream Deck.
+     - `streamdeck_callback(deck, key, state)`: Callback principal pour la gestion des actions sur les boutons. Oriente les actions vers `handle_streamdeck_event` selon le bouton pressé.
+
+#### 2. **presets.py**
+   - **Rôle** : Gère la création, le rappel, l’enregistrement et le chargement des presets pour chaque caméra.
+   - **Fonctions clés** :
+     - `get_real_button_number(button_number)`: Calcule l'identifiant global d’un bouton selon la page.
+     - `enregistrer_preset(deck, key, camera_number, recording_enabled, page)`: Enregistre les presets avec gestion d'incrémentation et d’écrasement.
+     - `rappeler_preset(deck, key, page)`: Rappelle le preset assigné à un bouton spécifique.
+     - `save_configuration(deck)`, `load_configuration(deck)`: Sauvegarde et charge les presets depuis `save.conf`.
+     - `adjust_camera_preset_count()`: Assure la cohérence du comptage des presets par caméra.
+     - `set_current_page(page)`: Synchronise la page actuelle avec `streamdeck_XL.py`.
+
+#### 3. **streamdeck.py**
+   - **Rôle** : Initialise et gère les interactions basiques avec le Stream Deck (affichage de boutons et événements).
+   - **Fonctions clés** :
+     - `initialize_streamdeck()`: Initialise le Stream Deck.
+     - `update_camera_buttons(deck, camera_number, recording_enabled)`: Mets à jour l'affichage des caméras en mode STORE.
+     - `set_toggle_button(deck, mode)`: Gère le bouton de bascule entre les modes.
+     - `handle_streamdeck_event(deck, key, state, camera_number, recording_enabled, save_configuration, enregistrer_preset, rappeler_preset)`: Délègue les actions de bouton selon le contexte.
+
+#### 4. **display.py**
+   - **Rôle** : Crée les images pour les boutons en fonction de l’état (couleur, texte).
+   - **Fonctions clés** :
+     - `create_button_image(deck, text, color)`: Génère une image de bouton.
+     - `update_save_button(deck, config_changed)`: Change l'affichage du bouton SAVE selon les changements non sauvegardés.
+
+#### 5. **tally.py**
+   - **Rôle** : Affiche l’état du Tally sur le Stream Deck pour les caméras en Program et Preview.
+   - **Fonctions clés** :
+     - `update_tally(deck)`: Assure la mise à jour de l’état Program et Preview sur le Stream Deck【470†source】.
+
+#### 6. **camera.py**
+   - **Rôle** : Gère l'envoi des commandes VISCA pour contrôler les caméras.
+   - **Fonctions clés** :
+     - `send_command(command)`: Envoie une commande série pour contrôler les caméras.
+
+#### 7. **sequences.py**
+   - **Rôle** : Exécute les séquences de rappel de presets.
+   - **Fonctions clés** :
+     - `sequence_actions(camera, preset)`: Envoie les commandes pour rappeler un preset pour une caméra spécifique.
+
+#### 8. **atem.py**
+   - **Rôle** : Interface avec l’ATEM pour récupérer et modifier les sources en Program et Preview.
+   - **Fonctions clés** :
+     - `connect_to_atem()`: Établit la connexion avec le switcher ATEM.
+
+
+### Relations entre les fichiers
+
+- **streamdeck_XL.py** est le fichier principal orchestrant l’ensemble des actions du Stream Deck. La fonction `streamdeck_callback` assure la logique de contrôle principal, tandis que `handle_streamdeck_event` dans **streamdeck.py** délègue les tâches aux fonctions de gestion du mode et de configuration.
+  
+- **presets.py** gère la logique des presets en enregistrement et en rappel, coordonnant avec **display.py** pour les changements de couleur des boutons, et **camera.py** pour envoyer les commandes VISCA.
+
+- **tally.py** met à jour les boutons du Stream Deck en fonction des états Program et Preview des caméras via l’ATEM.
+
+- **display.py** crée les images des boutons et fournit un retour visuel sur les actions du Stream Deck.
+
+- **atem.py** établit la connexion avec l’ATEM pour le contrôle du Tally.
+
+- **streamdeck.py** fournit les fonctions `initialize_streamdeck`, `set_toggle_button`, `update_camera_buttons`, et `handle_streamdeck_event`, délégant les actions spécifiques de chaque bouton aux fonctions des autres modules en fonction du mode et des configurations.
+
+- **sequences.py** gère les séquences d'actions complexes pour chaque caméra, appelées depuis **presets.py** lors de rappels de presets.
+
+### Arborescence des fichiers
 
 Le projet est structuré comme suit :
 
