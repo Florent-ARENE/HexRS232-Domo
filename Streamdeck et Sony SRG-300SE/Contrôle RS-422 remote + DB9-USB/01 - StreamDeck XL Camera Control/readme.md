@@ -39,7 +39,27 @@ En mode **STORE**, le bouton **SAVE** devient orange dès qu'un changement non s
 - **DSD TECH SH-G01B Isolateur USB** (pour éviter les interférences entre la télécommande RM-IP10 et l'ordinateur)
 - **Python 3.x** installé sur votre ordinateur
 
-### Installation des Dépendances
+### Installation de Python et des Dépendances
+
+#### Étapes d'installation de Python :
+
+1. **Téléchargez Python** depuis [python.org](https://www.python.org/downloads/) ou depuis le Microsoft Store.
+2. **Installez Python** en cochant la case "Add Python to PATH" (Ajouter Python au PATH).
+3. **Vérifiez l'installation** en ouvrant un terminal (ou PowerShell sur Windows) et en exécutant :
+   ```bash
+   python --version
+   ```
+   Vous devriez voir la version de Python installée.
+
+#### Ajout de Python aux variables d'environnement
+
+Si Python n’est pas trouvé dans votre PATH après l’installation :
+
+1. **Ouvrez les Paramètres Système Avancés** sur Windows.
+2. **Cliquez sur Variables d’environnement**.
+3. **Ajoutez un nouveau chemin** vers le dossier d’installation de Python (exemple : `C:\Python39`) dans la variable PATH.
+
+#### Installation des dépendances Python
 
 Installez les bibliothèques nécessaires via **pip** :
 
