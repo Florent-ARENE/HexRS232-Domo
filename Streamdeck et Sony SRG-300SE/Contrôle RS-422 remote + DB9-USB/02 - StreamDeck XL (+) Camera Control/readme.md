@@ -2,30 +2,30 @@
 
 ## Introduction
 
-Ce projet permet de contrôler jusqu'à **4 caméras Sony BRC-Z700** via un **Stream Deck XL**, en utilisant des commandes **VISCA** pour gérer et rappeler des presets pour chaque caméra. Il inclut également l'intégration d'un système **Tally** via un **ATEM**, permettant d'afficher sur le **Stream Deck** quelles caméras sont en **Program** (rouge) et en **Preview** (vert).
+Ce projet permet de contrôler jusqu'à **6 caméras Sony BRC-Z700** via un **Stream Deck XL**, en utilisant des commandes **VISCA** pour gérer et rappeler des presets pour chaque caméra. Il inclut également l'intégration d'un système **Tally** via un **ATEM**, permettant d'afficher sur le **Stream Deck** quelles caméras sont en **Program** (rouge) et en **Preview** (vert).
 
 Le projet prend en charge les modes **STORE** (enregistrement) et **RECALL** (rappel) des presets, avec un basculement simple entre ces deux modes via un bouton **toggle**.
 
 ## Fonctionnalités
 
-1. **Contrôle multi-caméras avec presets** : Contrôlez jusqu'à 4 caméras et gérez les presets pour chacune d’elles.
+1. **Contrôle multi-caméras avec presets** : Contrôlez jusqu'à 6 caméras et gérez les presets pour chacune d’elles.
 2. **Modes STORE/RECALL** :
-   - **STORE** : Enregistrement de presets via les boutons 1 à 6, 9 à 14, 17 à 22, 25 à 30.
+   - **STORE** : Enregistrement de presets via les boutons 8 à 31.
    - **RECALL** : Rappel des presets via les mêmes boutons.
-   - **Toggle** via le bouton 8 pour basculer entre les modes.
-3. **Intégration Tally avec ATEM** : Les boutons 7, 15, 23, 31 affichent l'état **Program** (rouge) et **Preview** (vert) pour les caméras connectées à l'ATEM. Le Tally est mis à jour automatiquement en mode RECALL.
-4. **Sauvegarde rapide des presets** : Enregistrez les presets dans un fichier `save.conf` via le bouton 16, qui est chargé automatiquement au démarrage du script.
+   - **Toggle** via le bouton 0 pour basculer entre les modes.
+3. **Intégration Tally avec ATEM** : Les boutons 3 à 7 affichent l'état **Program** (rouge) et **Preview** (vert) pour les caméras connectées à l'ATEM. Le Tally est mis à jour automatiquement en mode RECALL.
+4. **Sauvegarde rapide des presets** : Enregistrez les presets dans un fichier `save.conf` via le bouton 1 (SAVE), qui est chargé automatiquement au démarrage du script.
 5. **Verbose détaillé** : Le script affiche des messages dans la console pour chaque action (enregistrement/rappel de preset, changement de mode, etc.). Les logs incluent aussi la gestion des erreurs (commandes série, configuration).
 
 ## Aperçu des Modes
 
 ### Mode RECALL
-En mode **RECALL**, le bouton **SAVE** est vert si toutes les configurations sont sauvegardées. Les boutons Caméras (7, 15, 23, 31) indiquent l'état **Program** (rouge) ou **Preview** (vert) pour les caméras connectées.
+En mode **RECALL**, le bouton **SAVE** est vert clair si toutes les configurations sont sauvegardées. Les boutons Caméras (3 à 7) indiquent l'état **Program** (rouge) ou **Preview** (vert) pour les caméras connectées.
 
 ![Mode RECALL](imgs/recall.png)
 
 ### Mode STORE
-En mode **STORE**, le bouton **SAVE** devient orange dès qu'un changement non sauvegardé est détecté. Les caméras sont sélectionnables avec des boutons en bleu pour l'affichage actif.
+En mode **STORE**, le bouton **SAVE** devient jaune dès qu'un changement non sauvegardé est détecté. Les caméras sont sélectionnables avec des boutons en bleu pour l'affichage actif.
 
 ![Mode STORE](imgs/store.png)
 
@@ -82,10 +82,11 @@ Si vous rencontrez des erreurs avec **hidapi**, suivez les étapes ci-dessous po
 2. **Connectez l'ATEM** pour gérer le Tally (adresse IP à configurer dans le script).
 3. **Lancez le script** `streamdeck_XL.py`.
 4. **Utilisez les boutons pour interagir** :
-   - **Bouton 8** : Basculer entre le mode **STORE** et **RECALL**.
-   - **Boutons 1 à 6, 9 à 14, 17 à 22, 25 à 30** : Enregistrer ou rappeler des presets selon le mode sélectionné.
-   - **Boutons 7, 15, 23, 31** : Sélectionner la caméra en mode **STORE** et afficher l'état **Tally** en mode **RECALL**.
-   - **Bouton 16** : Sauvegarder la configuration actuelle dans `save.conf`.
+   - **Bouton 0** : Basculer entre le mode **STORE** et **RECALL**.
+   - **Bouton 1** : Sauvegarder la configuration actuelle dans `save.conf`.
+   - **Bouton 2** : Changer de page sur le Stream Deck.
+   - **Boutons 3 à 7** : Sélectionner une caméra active.
+   - **Boutons 8 à 31** : Enregistrer ou rappeler des presets selon le mode sélectionné.
 
 ## Commandes VISCA pour la Caméra BRC-Z700
 
@@ -154,7 +155,9 @@ Exemple de fichier `save.conf` :
    - **Fonctions clés** :
      - `initialize_streamdeck()`: Initialise le Stream Deck.
      - `update_camera_buttons(deck, camera_number, recording_enabled)`: Mets à jour l'affichage des caméras en mode STORE.
-     - `set_toggle_button(deck, mode)`: Gère le bouton de bascule entre les modes.
+     - `set_toggle_button(deck, mode)`: Gère
+
+ le bouton de bascule entre les modes.
      - `handle_streamdeck_event(deck, key, state, camera_number, recording_enabled, save_configuration, enregistrer_preset, rappeler_preset)`: Délègue les actions de bouton selon le contexte.
 
 #### 4. **display.py**
@@ -166,7 +169,7 @@ Exemple de fichier `save.conf` :
 #### 5. **tally.py**
    - **Rôle** : Affiche l’état du Tally sur le Stream Deck pour les caméras en Program et Preview.
    - **Fonctions clés** :
-     - `update_tally(deck)`: Assure la mise à jour de l’état Program et Preview sur le Stream Deck【470†source】.
+     - `update_tally(deck)`: Assure la mise à jour de l’état Program et Preview sur le Stream Deck.
 
 #### 6. **camera.py**
    - **Rôle** : Gère l'envoi des commandes VISCA pour contrôler les caméras.
@@ -182,7 +185,6 @@ Exemple de fichier `save.conf` :
    - **Rôle** : Interface avec l’ATEM pour récupérer et modifier les sources en Program et Preview.
    - **Fonctions clés** :
      - `connect_to_atem()`: Établit la connexion avec le switcher ATEM.
-
 
 ### Relations entre les fichiers
 
