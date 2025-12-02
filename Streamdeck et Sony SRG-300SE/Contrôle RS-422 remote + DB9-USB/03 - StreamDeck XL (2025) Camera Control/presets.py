@@ -1,6 +1,7 @@
 # presets.py
 import json
 import os
+import threading
 from display import create_button_image, update_save_button
 from camera import send_command
 from sequences import sequence_actions
@@ -65,6 +66,7 @@ def enregistrer_preset(deck, key, camera_number, recording_enabled, page):
 def rappeler_preset(deck, key, page):
     """
     Recall a preset based on the button key and page.
+    Lance la séquence dans un thread séparé pour permettre l'interruption.
     """
     set_current_page(page)
     real_key = get_real_button_number(key)
@@ -72,8 +74,13 @@ def rappeler_preset(deck, key, page):
     if real_key in preset_camera_map:
         camera_to_use, preset_number = preset_camera_map[real_key]
         if preset_number in camera_presets[camera_to_use]:
-            # Passer le deck pour activer le clignotement pendant la séquence
-            sequence_actions(camera_to_use, preset_number, deck)
+            # Lancer la séquence dans un thread séparé pour ne pas bloquer le callback
+            sequence_thread = threading.Thread(
+                target=sequence_actions,
+                args=(camera_to_use, preset_number, deck),
+                daemon=True
+            )
+            sequence_thread.start()
             print(f"Rappel du preset {preset_number} pour la caméra {camera_to_use} depuis le bouton {key}.")
         else:
             print(f"Erreur : le preset {preset_number} n'existe pas pour la caméra {camera_to_use}.")

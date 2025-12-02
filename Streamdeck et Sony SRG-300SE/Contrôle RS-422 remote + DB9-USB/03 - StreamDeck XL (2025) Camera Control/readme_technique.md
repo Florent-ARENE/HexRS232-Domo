@@ -16,8 +16,9 @@ Ce document détaille le protocole de communication UDP utilisé par les switche
 6. [atem.py - Wrapper PyATEMMax](#atempy---wrapper-pyatemmax)
 7. [Configuration des caméras](#configuration-des-caméras)
 8. [Système de feedback visuel](#système-de-feedback-visuel-sequencespy)
-9. [Historique des découvertes](#historique-des-découvertes)
-10. [Référence des commandes](#référence-des-commandes)
+9. [Système d'interruption des séquences](#système-dinterruption-des-séquences)
+10. [Historique des découvertes](#historique-des-découvertes)
+11. [Référence des commandes](#référence-des-commandes)
 
 ---
 
@@ -684,6 +685,189 @@ def _blink_recall_button(deck):
 
 ---
 
+## Système d'interruption des séquences
+
+### Vue d'ensemble
+
+Le système permet d'interrompre une séquence de rappel en cours en appuyant sur le bouton RECALL pendant qu'il clignote. Cela est utile en cas d'erreur d'appui ou pour annuler une action.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    presets.py                           │
+│  rappeler_preset() lance sequence_actions() dans un     │
+│  thread séparé pour ne pas bloquer le callback          │
+└─────────────────────┬───────────────────────────────────┘
+                      │ Thread séparé
+                      ▼
+┌─────────────────────────────────────────────────────────┐
+│                   sequences.py                          │
+│  - sequence_stop_requested : flag d'arrêt              │
+│  - request_stop() : demande l'arrêt                    │
+│  - interruptible_sleep() : sleep avec vérification     │
+│  - sequence_actions() vérifie le flag entre étapes     │
+└─────────────────────────────────────────────────────────┘
+                      ▲
+                      │ Appel request_stop()
+┌─────────────────────┴───────────────────────────────────┐
+│                 streamdeck_XL.py                        │
+│  Callback intercepte l'appui sur bouton 0 pendant      │
+│  sequence_running == True                              │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Exécution en thread séparé
+
+Le problème initial était que la séquence s'exécutait de manière synchrone dans le callback du Stream Deck, bloquant la réception d'autres événements pendant ~8 secondes.
+
+**Solution** : Lancer la séquence dans un thread séparé.
+
+```python
+# presets.py
+def rappeler_preset(deck, key, page):
+    # ...
+    sequence_thread = threading.Thread(
+        target=sequence_actions,
+        args=(camera_to_use, preset_number, deck),
+        daemon=True
+    )
+    sequence_thread.start()
+```
+
+### Flags et fonctions d'interruption
+
+```python
+# sequences.py
+
+# Flag pour demander l'arrêt
+sequence_stop_requested = False
+
+def request_stop():
+    """Demande l'arrêt de la séquence en cours"""
+    global sequence_stop_requested
+    sequence_stop_requested = True
+    print("⚠️ Arrêt de la séquence demandé par l'utilisateur")
+
+def is_stop_requested():
+    """Vérifie si l'arrêt a été demandé"""
+    return sequence_stop_requested
+```
+
+### Sleep interruptible
+
+Remplace `time.sleep()` pour permettre une interruption rapide :
+
+```python
+def interruptible_sleep(duration, check_interval=0.1):
+    """
+    Sleep qui vérifie périodiquement si l'arrêt est demandé.
+    
+    Args:
+        duration: Durée totale en secondes
+        check_interval: Intervalle de vérification (100ms par défaut)
+    
+    Returns:
+        True si terminé normalement, False si interrompu
+    """
+    elapsed = 0
+    while elapsed < duration:
+        if sequence_stop_requested:
+            return False
+        time.sleep(min(check_interval, duration - elapsed))
+        elapsed += check_interval
+    return True
+```
+
+### Vérification entre chaque étape
+
+La fonction `sequence_actions()` vérifie le flag d'arrêt avant chaque action :
+
+```python
+def sequence_actions(camera_number, preset_number, deck=None):
+    # ...
+    try:
+        # Étape 1
+        if is_stop_requested():
+            print("🛑 Séquence interrompue avant l'étape 1")
+            return
+        recall_preset(6, 16)
+        
+        # Temporisation interruptible
+        if not interruptible_sleep(2):
+            print("🛑 Séquence interrompue pendant la temporisation")
+            return
+        
+        # Étape 3
+        if is_stop_requested():
+            print("🛑 Séquence interrompue avant l'étape 3")
+            return
+        set_camera_preview(6)
+        
+        # ... autres étapes ...
+        
+    finally:
+        # Toujours réinitialiser et arrêter le clignotement
+        sequence_stop_requested = False
+        if deck:
+            stop_blink(deck)
+```
+
+### Gestion dans le callback
+
+```python
+# streamdeck_XL.py
+def streamdeck_callback(deck, key, state):
+    # Pendant une séquence, seul le bouton 0 peut interrompre
+    if sequences.sequence_running:
+        if state and key == 0:
+            sequences.request_stop()
+        # Ignorer TOUS les autres événements
+        return
+    
+    # Traitement normal...
+```
+
+### Diagramme de séquence d'interruption
+
+```
+    Utilisateur           StreamDeck           sequences.py
+         │                    │                     │
+         │  Appui preset      │                     │
+         │───────────────────>│                     │
+         │                    │  rappeler_preset()  │
+         │                    │────────────────────>│
+         │                    │                     │ Thread séparé
+         │                    │                     │ start_blink()
+         │                    │                     │ sequence_running = True
+         │                    │                     │
+         │  [Bouton clignote] │                     │ Étape 1...
+         │                    │                     │ interruptible_sleep(2)
+         │                    │                     │   ↓ vérifie toutes les 100ms
+         │  Appui RECALL      │                     │
+         │───────────────────>│                     │
+         │                    │  request_stop()     │
+         │                    │────────────────────>│
+         │                    │                     │ sequence_stop_requested = True
+         │                    │                     │
+         │                    │                     │ ← interruptible_sleep retourne False
+         │                    │                     │ print("🛑 Séquence interrompue...")
+         │                    │                     │ stop_blink()
+         │                    │                     │ sequence_running = False
+         │                    │                     │
+         │  [Bouton normal]   │                     │
+         │                    │                     │
+```
+
+### Points importants
+
+1. **Délai maximum** : L'arrêt prend au maximum 100ms (intervalle de vérification)
+2. **Actions non annulables** : Les actions déjà exécutées (transitions, presets) ne sont pas annulées
+3. **Réinitialisation** : Le flag `sequence_stop_requested` est toujours réinitialisé dans le bloc `finally`
+4. **Thread daemon** : Le thread de séquence est un daemon, il s'arrête si le programme principal se termine
+
+---
+
 ## Historique des découvertes
 
 ### Problème initial
@@ -744,6 +928,23 @@ Cause:
 
 Solution:
 - Utiliser le format sans mask byte
+```
+
+### Découverte #4 : Callback bloquant
+
+```
+Observation:
+- L'appui sur RECALL pendant la séquence passait en mode STORE après la fin
+- La séquence ne pouvait pas être interrompue
+
+Cause:
+- La séquence s'exécutait de manière synchrone dans le callback
+- Le callback était bloqué pendant ~8 secondes
+- Les événements étaient mis en file d'attente
+
+Solution:
+- Exécuter la séquence dans un thread séparé
+- Implémenter un système d'interruption avec flag et sleep interruptible
 ```
 
 ---

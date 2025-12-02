@@ -58,8 +58,13 @@ def perform_save(deck):
 def streamdeck_callback(deck, key, state):
     global recording_enabled, config_changed, camera_number
     
-    # Ignorer les événements pendant une séquence
+    # Pendant une séquence, seul le bouton 0 (RECALL) peut interrompre
     if sequences.sequence_running:
+        if state and key == 0:
+            # Demander l'arrêt de la séquence
+            sequences.request_stop()
+        # IMPORTANT: Ignorer TOUS les événements pendant la séquence
+        # pour éviter qu'ils soient traités après la fin de la séquence
         return
     
     if state:

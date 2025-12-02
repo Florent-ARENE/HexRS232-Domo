@@ -18,7 +18,8 @@ Le projet prend en charge les modes **STORE** (enregistrement) et **RECALL** (ra
 3. **Intégration Tally avec ATEM** : Les boutons 3 à 7 affichent l'état **Program** (rouge) et **Preview** (vert) pour les caméras connectées à l'ATEM. Le Tally est mis à jour automatiquement en mode RECALL.
 4. **Contrôle ATEM natif** : Changement de Preview et transitions AUTO via protocole UDP natif (sans dépendance PyATEMMax).
 5. **Sauvegarde rapide des presets** : Enregistrez les presets dans un fichier `save.conf` via le bouton 1 (SAVE), qui est chargé automatiquement au démarrage du script.
-6. **Verbose détaillé** : Le script affiche des messages dans la console pour chaque action (enregistrement/rappel de preset, changement de mode, etc.). Les logs incluent aussi la gestion des erreurs (commandes série, configuration).
+6. **Interruption des séquences** : Possibilité d'arrêter une séquence de rappel en cours en appuyant sur le bouton RECALL clignotant.
+7. **Verbose détaillé** : Le script affiche des messages dans la console pour chaque action (enregistrement/rappel de preset, changement de mode, etc.). Les logs incluent aussi la gestion des erreurs (commandes série, configuration).
 
 ## Aperçu des Modes
 
@@ -106,7 +107,7 @@ camera_input_map = {
     3: 3,   # Caméra 3 → ATEM input 3
     4: 4,   # Caméra 4 → ATEM input 4
     5: 5,   # Caméra 5 → ATEM input 5
-    6: 8    # Caméra 6 → ATEM input 8
+    6: 6    # Caméra 6 → ATEM input 6
 }
 ```
 
@@ -155,7 +156,17 @@ Pendant l'exécution de la séquence (~9 secondes) :
 - **Interactions bloquées** : Tous les boutons sont désactivés jusqu'à la fin de la séquence
 - **Affichage figé** : Le Tally et les autres boutons ne sont pas mis à jour
 
-Cela évite les actions accidentelles pendant le déroulement de la séquence automatisée.
+### Interruption d'une séquence
+
+En cas d'erreur d'appui ou pour annuler une séquence en cours :
+
+1. **Appuyez sur le bouton RECALL** (bouton 0) pendant qu'il clignote
+2. La séquence s'arrête immédiatement (délai max ~100ms)
+3. Un message `🛑 Séquence interrompue...` s'affiche dans la console
+4. Le bouton RECALL revient à son état normal (rouge foncé)
+5. Le système est prêt pour une nouvelle action
+
+> **Note** : L'interruption arrête la séquence à l'étape en cours. Les actions déjà exécutées (transitions, presets rappelés) ne sont pas annulées.
 
 ## Commandes VISCA pour la Caméra BRC-Z700
 
@@ -208,11 +219,11 @@ Exemple de fichier `save.conf` :
 | `streamdeck_XL.py` | Fichier principal, orchestration générale |
 | `streamdeck.py` | Initialisation et gestion des événements Stream Deck |
 | `presets.py` | Gestion des presets (enregistrement, rappel, sauvegarde) |
-| `sequences.py` | Séquences de rappel avec contrôle ATEM |
+| `sequences.py` | Séquences de rappel avec contrôle ATEM et système d'interruption |
 | `camera.py` | Commandes série VISCA |
 | `tally.py` | Affichage Tally (Program/Preview) |
 | `atem.py` | Interface ATEM (wrapper compatible PyATEMMax) |
-| `atem_client.py` | **Nouveau** - Client ATEM UDP natif |
+| `atem_client.py` | Client ATEM UDP natif |
 | `display.py` | Création des images pour les boutons |
 
 > 📘 Pour les détails techniques de `atem_client.py` et du protocole ATEM, voir [readme_technique.md](readme_technique.md).
@@ -222,8 +233,8 @@ Exemple de fichier `save.conf` :
 ```
 streamdeck_XL.py (main)
     ├── streamdeck.py      → Initialisation et événements Stream Deck
-    ├── presets.py         → Logique des presets
-    │   ├── sequences.py   → Séquences de rappel avec ATEM
+    ├── presets.py         → Logique des presets (lance séquences en thread)
+    │   ├── sequences.py   → Séquences de rappel avec ATEM + interruption
     │   │   └── atem.py    → Interface ATEM
     │   │       └── atem_client.py  → Client UDP natif
     │   └── camera.py      → Commandes VISCA série
@@ -271,6 +282,12 @@ streamdeck_XL.py (main)
 1. Vérifier le port COM dans `camera.py`
 2. Vérifier le câblage DB9/USB
 3. Vérifier le baudrate (38400)
+
+### La séquence ne s'interrompt pas
+
+1. Vérifier que vous appuyez bien sur le bouton 0 (RECALL) pendant le clignotement
+2. L'arrêt peut prendre jusqu'à 100ms pour être effectif
+3. Vérifier les messages dans la console (`🛑 Séquence interrompue...`)
 
 ### Erreur "No module named PIL"
 
