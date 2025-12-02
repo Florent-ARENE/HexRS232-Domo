@@ -1,5 +1,6 @@
 # streamdeck_XL.py (main)
 import time
+import sequences  # Import du module pour accéder à sequence_running dynamiquement
 from tally import update_tally
 from presets import enregistrer_preset, rappeler_preset, save_configuration, load_configuration, set_current_page
 from streamdeck import initialize_streamdeck, set_toggle_button, update_camera_buttons
@@ -14,6 +15,11 @@ current_page = 1
 # Mise à jour de l'affichage
 def update_display(deck):
     global recording_enabled, config_changed
+    
+    # Ne pas mettre à jour l'affichage pendant une séquence (clignotement en cours)
+    if sequences.sequence_running:
+        return
+    
     if recording_enabled:
         update_camera_buttons(deck, camera_number, recording_enabled)
     else:
@@ -51,6 +57,11 @@ def perform_save(deck):
 
 def streamdeck_callback(deck, key, state):
     global recording_enabled, config_changed, camera_number
+    
+    # Ignorer les événements pendant une séquence
+    if sequences.sequence_running:
+        return
+    
     if state:
         if key == 0:
             recording_enabled = not recording_enabled

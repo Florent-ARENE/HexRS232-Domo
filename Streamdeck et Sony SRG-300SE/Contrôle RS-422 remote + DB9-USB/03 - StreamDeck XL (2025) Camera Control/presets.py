@@ -72,7 +72,8 @@ def rappeler_preset(deck, key, page):
     if real_key in preset_camera_map:
         camera_to_use, preset_number = preset_camera_map[real_key]
         if preset_number in camera_presets[camera_to_use]:
-            sequence_actions(camera_to_use, preset_number)
+            # Passer le deck pour activer le clignotement pendant la séquence
+            sequence_actions(camera_to_use, preset_number, deck)
             print(f"Rappel du preset {preset_number} pour la caméra {camera_to_use} depuis le bouton {key}.")
         else:
             print(f"Erreur : le preset {preset_number} n'existe pas pour la caméra {camera_to_use}.")

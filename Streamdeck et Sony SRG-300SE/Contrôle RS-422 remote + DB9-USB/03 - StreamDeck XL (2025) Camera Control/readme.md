@@ -106,7 +106,7 @@ camera_input_map = {
     3: 3,   # Caméra 3 → ATEM input 3
     4: 4,   # Caméra 4 → ATEM input 4
     5: 5,   # Caméra 5 → ATEM input 5
-    6: 6    # Caméra 6 → ATEM input 6
+    6: 8    # Caméra 6 → ATEM input 8
 }
 ```
 
@@ -146,6 +146,16 @@ Lorsqu'un preset est rappelé, la séquence suivante est exécutée automatiquem
 7. Passage caméra cible en Preview
 8. Transition AUTO
 9. Rappel preset 15 sur caméra 6 (plan flou)
+
+### Feedback visuel pendant la séquence
+
+Pendant l'exécution de la séquence (~9 secondes) :
+
+- **Bouton RECALL (0)** : Effet de pulsation rouge (breathing) indiquant que la séquence est en cours
+- **Interactions bloquées** : Tous les boutons sont désactivés jusqu'à la fin de la séquence
+- **Affichage figé** : Le Tally et les autres boutons ne sont pas mis à jour
+
+Cela évite les actions accidentelles pendant le déroulement de la séquence automatisée.
 
 ## Commandes VISCA pour la Caméra BRC-Z700
 

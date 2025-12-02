@@ -15,8 +15,9 @@ Ce document détaille le protocole de communication UDP utilisé par les switche
 5. [atem_client.py - Implémentation](#atem_clientpy---implémentation)
 6. [atem.py - Wrapper PyATEMMax](#atempy---wrapper-pyatemmax)
 7. [Configuration des caméras](#configuration-des-caméras)
-8. [Historique des découvertes](#historique-des-découvertes)
-9. [Référence des commandes](#référence-des-commandes)
+8. [Système de feedback visuel](#système-de-feedback-visuel-sequencespy)
+9. [Historique des découvertes](#historique-des-découvertes)
+10. [Référence des commandes](#référence-des-commandes)
 
 ---
 
@@ -598,6 +599,88 @@ Le calcul dans le code :
 ```python
 command_prefix = 0x80 + camera_number  # 0x81 pour caméra 1, 0x86 pour caméra 6
 ```
+
+---
+
+## Système de feedback visuel (sequences.py)
+
+### Vue d'ensemble
+
+Pendant l'exécution d'une séquence de rappel de preset, le système fournit un feedback visuel et bloque les interactions utilisateur pour éviter les actions accidentelles.
+
+### Flag `sequence_running`
+
+Variable globale exportée par `sequences.py` :
+
+```python
+# Dans sequences.py
+sequence_running = False  # True pendant l'exécution d'une séquence
+
+def start_blink(deck):
+    global sequence_running
+    sequence_running = True
+    # ...
+
+def stop_blink(deck):
+    global sequence_running
+    sequence_running = False
+    # ...
+```
+
+### Utilisation dans streamdeck_XL.py
+
+```python
+import sequences  # Import du module entier pour accès dynamique
+
+def update_display(deck):
+    # Ne pas mettre à jour pendant une séquence
+    if sequences.sequence_running:
+        return
+    # ...
+
+def streamdeck_callback(deck, key, state):
+    # Ignorer les événements pendant une séquence
+    if sequences.sequence_running:
+        return
+    # ...
+```
+
+**Important** : Il faut importer le module (`import sequences`) et non la variable (`from sequences import sequence_running`), sinon la valeur ne sera pas mise à jour dynamiquement.
+
+### Effet de pulsation (breathing)
+
+Le bouton RECALL pulse en rouge pendant la séquence :
+
+```python
+def _blink_recall_button(deck):
+    min_intensity = 30       # Rouge sombre
+    max_intensity = 255      # Rouge vif
+    steps = 20               # Étapes par cycle
+    delay = 0.04             # 40ms entre chaque étape
+    
+    intensity = min_intensity
+    direction = 1  # 1 = montée, -1 = descente
+    step_size = (max_intensity - min_intensity) // (steps // 2)
+    
+    while _blink_active:
+        deck.set_key_image(0, create_button_image(
+            deck, "RECALL", (intensity, 0, 0), text_color="white", bold=True
+        ))
+        
+        intensity += direction * step_size
+        
+        if intensity >= max_intensity:
+            direction = -1
+        elif intensity <= min_intensity:
+            direction = 1
+        
+        time.sleep(delay)
+```
+
+**Paramètres de l'animation** :
+- Cycle complet : ~1.6 secondes (montée + descente)
+- Intensité : varie de 30 (sombre) à 255 (vif)
+- Thread daemon : s'arrête automatiquement si le programme principal se termine
 
 ---
 
