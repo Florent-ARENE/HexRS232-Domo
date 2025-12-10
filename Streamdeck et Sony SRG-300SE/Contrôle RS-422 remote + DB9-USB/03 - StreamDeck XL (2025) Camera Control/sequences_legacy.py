@@ -1,6 +1,8 @@
-## sequences_alt.py
-## Version alternative : plan large uniquement si même caméra que Program
-## Ajout : Vérification/forçage du style MIX avant chaque séquence
+## sequences.py
+"""
+Gestion des séquences de transition avec contrôle ATEM.
+Ajout : Vérification/forçage du style MIX avant chaque séquence.
+"""
 import time
 import threading
 from atem import switcher  # Importation de la connexion ATEM depuis atem.py
@@ -55,7 +57,6 @@ def _blink_recall_button(deck):
         
         time.sleep(delay)
 
-
 def start_blink(deck):
     """Démarre le clignotement du bouton RECALL"""
     global _blink_active, _blink_thread, sequence_running, sequence_stop_requested
@@ -64,7 +65,6 @@ def start_blink(deck):
     _blink_active = True
     _blink_thread = threading.Thread(target=_blink_recall_button, args=(deck,), daemon=True)
     _blink_thread.start()
-
 
 def stop_blink(deck):
     """Arrête le clignotement et restaure le bouton RECALL normal"""
@@ -79,18 +79,15 @@ def stop_blink(deck):
     except Exception:
         pass
 
-
 def request_stop():
     """Demande l'arrêt de la séquence en cours"""
     global sequence_stop_requested
     sequence_stop_requested = True
     print("⚠️ Arrêt de la séquence demandé par l'utilisateur")
 
-
 def is_stop_requested():
     """Vérifie si l'arrêt a été demandé"""
     return sequence_stop_requested
-
 
 def interruptible_sleep(duration, check_interval=0.1):
     """
@@ -111,7 +108,6 @@ def interruptible_sleep(duration, check_interval=0.1):
         elapsed += check_interval
     return True
 
-
 def ensure_mix_mode():
     """
     Vérifie et force le mode de transition MIX si nécessaire.
@@ -129,29 +125,6 @@ def ensure_mix_mode():
         print(f"⚠️ Erreur lors de la vérification du mode transition: {e}")
         return False
 
-
-def get_program_camera():
-    """
-    Récupère le numéro de caméra actuellement en Program.
-    
-    Returns:
-        Numéro de caméra (1-6) ou None si non trouvé
-    """
-    try:
-        program_input = switcher.programInput[0].videoSource  # ex: "input3"
-        if program_input is None:
-            return None
-        input_number = int(program_input.replace('input', ''))  # ex: 3
-        # Trouver la caméra correspondante dans camera_input_map
-        for camera, atem_input in camera_input_map.items():
-            if atem_input == input_number:
-                return camera
-        return None
-    except Exception as e:
-        print(f"Erreur lors de la récupération de la caméra Program: {e}")
-        return None
-
-
 def set_camera_preview(camera_number):
     try:
         if camera_number in camera_input_map:
@@ -163,7 +136,6 @@ def set_camera_preview(camera_number):
     except Exception as e:
         print(f"Erreur: Impossible de mettre la caméra {camera_number} en Preview : {e}")
 
-
 def auto_transition():
     try:
         print("Lancement de la transition AUTO")
@@ -171,7 +143,6 @@ def auto_transition():
         print("Transition AUTO effectuée avec succès")
     except Exception as e:
         print(f"Erreur: La transition automatique a échoué : {e}")
-
 
 def recall_preset(camera_number, preset_number):
     command_prefix = 0x80 + camera_number
@@ -183,10 +154,7 @@ def recall_preset(camera_number, preset_number):
 def sequence_actions(camera_number, preset_number, deck=None):
     """
     Exécute la séquence de transition avec clignotement du bouton RECALL.
-    
-    VERSION ALTERNATIVE :
-    - Si la caméra cible est DIFFÉRENTE de celle en Program → Transition directe (~3s)
-    - Si la caméra cible est la MÊME que celle en Program → Passage par plan large (~9s)
+    La séquence peut être interrompue en appelant request_stop().
     
     IMPORTANT: Vérifie/force le mode MIX avant de commencer les transitions.
     
@@ -203,23 +171,12 @@ def sequence_actions(camera_number, preset_number, deck=None):
     
     try:
         # ============================================
-        # ÉTAPE 0: Déterminer le type de séquence
+        # ÉTAPE 0: Vérification du mode de transition
         # ============================================
-        program_camera = get_program_camera()
-        same_camera = (program_camera == camera_number)
-        
         print("=" * 50)
         print("🎬 Début de la séquence de transition")
         print("=" * 50)
         
-        if same_camera:
-            print(f"📷 Même caméra ({camera_number}) - Passage par plan large")
-        else:
-            print(f"📷 Caméra différente ({program_camera} → {camera_number}) - Transition directe")
-        
-        # ============================================
-        # ÉTAPE 0b: Vérification du mode de transition
-        # ============================================
         if ENSURE_MIX_TRANSITION:
             print("\n📋 Vérification du style de transition...")
             if not ensure_mix_mode():
@@ -229,115 +186,77 @@ def sequence_actions(camera_number, preset_number, deck=None):
                 print("🛑 Séquence interrompue pendant la vérification du mode")
                 return
         
-        # ============================================
-        # SÉQUENCE SELON LE CAS
-        # ============================================
+        # Étape 1: Rappel explicite du preset 16 pour la caméra 6 (plan large)
+        if is_stop_requested():
+            print("🛑 Séquence interrompue avant l'étape 1")
+            return
+        print("\n[Étape 1/9] Rappel preset 16 caméra 6 (plan large)")
+        recall_preset(6, 16)
+        print("Preset 16 pour la caméra 6 envoyé avec succès")
+
+        # Étape 2: Temporisation (interruptible)
+        print("\n[Étape 2/9] Temporisation 2s...")
+        if not interruptible_sleep(2):
+            print("🛑 Séquence interrompue pendant la temporisation 1")
+            return
+
+        # Étape 3: Passer la caméra 6 en Preview
+        if is_stop_requested():
+            print("🛑 Séquence interrompue avant l'étape 3")
+            return
+        print("\n[Étape 3/9] Caméra 6 en Preview")
+        set_camera_preview(6)
+
+        # Étape 4: Lancer la transition AUTO
+        if is_stop_requested():
+            print("🛑 Séquence interrompue avant l'étape 4")
+            return
+        print("\n[Étape 4/9] Transition AUTO vers plan large")
+        auto_transition()
         
-        if same_camera:
-            # ========================================
-            # SÉQUENCE COMPLÈTE (même caméra) - ~9s
-            # ========================================
-            
-            # Étape 1: Rappel preset 16 caméra 6 (plan large)
-            if is_stop_requested():
-                print("🛑 Séquence interrompue avant l'étape 1")
-                return
-            print("\n[Étape 1/9] Rappel preset 16 caméra 6 (plan large)")
-            recall_preset(6, 16)
+        if not interruptible_sleep(1.5):
+            print("🛑 Séquence interrompue pendant la transition 1")
+            return
 
-            # Étape 2: Temporisation
-            print("\n[Étape 2/9] Temporisation 2s...")
-            if not interruptible_sleep(2):
-                print("🛑 Séquence interrompue pendant la temporisation 1")
-                return
-
-            # Étape 3: Caméra 6 en Preview
-            if is_stop_requested():
-                print("🛑 Séquence interrompue avant l'étape 3")
-                return
-            print("\n[Étape 3/9] Caméra 6 en Preview")
-            set_camera_preview(6)
-
-            # Étape 4: Transition AUTO vers plan large
-            if is_stop_requested():
-                print("🛑 Séquence interrompue avant l'étape 4")
-                return
-            print("\n[Étape 4/9] Transition AUTO vers plan large")
-            auto_transition()
-            
-            if not interruptible_sleep(1.5):
-                print("🛑 Séquence interrompue pendant la transition 1")
-                return
-
-            # Étape 5: Rappel preset caméra cible
-            if is_stop_requested():
-                print("🛑 Séquence interrompue avant l'étape 5")
-                return
-            print(f"\n[Étape 5/9] Rappel preset {preset_number} caméra {camera_number}")
+        # Étape 5: Rappel du preset de la caméra active
+        if is_stop_requested():
+            print("🛑 Séquence interrompue avant l'étape 5")
+            return
+        print(f"\n[Étape 5/9] Rappel preset {preset_number} caméra {camera_number}")
+        if camera_number != 6:
             recall_preset(camera_number, preset_number)
 
-            # Étape 6: Temporisation
-            print("\n[Étape 6/9] Temporisation 2s...")
-            if not interruptible_sleep(2):
-                print("🛑 Séquence interrompue pendant la temporisation 2")
-                return
+        # Étape 6: Temporisation (interruptible)
+        print("\n[Étape 6/9] Temporisation 2s...")
+        if not interruptible_sleep(2):
+            print("🛑 Séquence interrompue pendant la temporisation 2")
+            return
 
-            # Étape 7: Caméra cible en Preview
-            if is_stop_requested():
-                print("🛑 Séquence interrompue avant l'étape 7")
-                return
-            print(f"\n[Étape 7/9] Caméra {camera_number} en Preview")
-            set_camera_preview(camera_number)
+        # Étape 7: Passer la caméra active en Preview
+        if is_stop_requested():
+            print("🛑 Séquence interrompue avant l'étape 7")
+            return
+        print(f"\n[Étape 7/9] Caméra {camera_number} en Preview")
+        set_camera_preview(camera_number)
 
-            # Étape 8: Transition AUTO vers caméra cible
-            if is_stop_requested():
-                print("🛑 Séquence interrompue avant l'étape 8")
-                return
-            print(f"\n[Étape 8/9] Transition AUTO vers caméra {camera_number}")
-            auto_transition()
-            
-            if not interruptible_sleep(1.5):
-                print("🛑 Séquence interrompue pendant la transition 2")
-                return
-            
-            # Étape 9: Preset 15 caméra 6 (plan flou)
-            if is_stop_requested():
-                print("🛑 Séquence interrompue avant l'étape 9")
-                return
-            print("\n[Étape 9/9] Rappel preset 15 caméra 6 (plan flou)")
-            recall_preset(6, 15)
+        # Étape 8: Lancer la transition AUTO
+        if is_stop_requested():
+            print("🛑 Séquence interrompue avant l'étape 8")
+            return
+        print(f"\n[Étape 8/9] Transition AUTO vers caméra {camera_number}")
+        auto_transition()
         
-        else:
-            # ========================================
-            # SÉQUENCE COURTE (caméra différente) - ~3s
-            # ========================================
-            
-            # Étape 1: Rappel preset caméra cible
-            if is_stop_requested():
-                print("🛑 Séquence interrompue avant le rappel du preset")
-                return
-            print(f"\n[Étape 1/4] Rappel preset {preset_number} caméra {camera_number}")
-            recall_preset(camera_number, preset_number)
-
-            # Étape 2: Temporisation pour que la caméra se cale
-            print("\n[Étape 2/4] Temporisation 1.5s (calage caméra)...")
-            if not interruptible_sleep(1.5):
-                print("🛑 Séquence interrompue pendant la temporisation")
-                return
-
-            # Étape 3: Caméra cible en Preview
-            if is_stop_requested():
-                print("🛑 Séquence interrompue avant le passage en Preview")
-                return
-            print(f"\n[Étape 3/4] Caméra {camera_number} en Preview")
-            set_camera_preview(camera_number)
-
-            # Étape 4: Transition AUTO
-            if is_stop_requested():
-                print("🛑 Séquence interrompue avant la transition")
-                return
-            print(f"\n[Étape 4/4] Transition AUTO vers caméra {camera_number}")
-            auto_transition()
+        if not interruptible_sleep(1.5):
+            print("🛑 Séquence interrompue pendant la transition 2")
+            return
+        
+        # Étape 9: Rappel explicite du preset 15 pour la caméra 6 (plan flou)
+        if is_stop_requested():
+            print("🛑 Séquence interrompue avant l'étape 9")
+            return
+        print("\n[Étape 9/9] Rappel preset 15 caméra 6 (plan flou)")
+        recall_preset(6, 15)
+        print("Preset 15 pour la caméra 6 envoyé avec succès")
         
         print("\n" + "=" * 50)
         print("✅ Séquence terminée avec succès")

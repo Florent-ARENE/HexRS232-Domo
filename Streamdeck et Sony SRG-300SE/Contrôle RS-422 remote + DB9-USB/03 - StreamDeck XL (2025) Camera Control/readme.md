@@ -10,7 +10,7 @@ Le projet prend en charge les modes **STORE** (enregistrement) et **RECALL** (ra
 
 ## Fonctionnalités
 
-1. **Contrôle multi-caméras avec presets** : Contrôlez jusqu'à 6 caméras et gérez les presets pour chacune d'elles.
+1. **Contrôle multi-caméras avec presets** : Contrôlez jusqu'à 6 caméras et gérez les presets pour chacune d'elles. Chaque caméra peut avoir ses propres presets enregistrés et rappelés indépendamment.
 2. **Modes STORE/RECALL** :
    - **STORE** : Enregistrement de presets via les boutons 8 à 31.
    - **RECALL** : Rappel des presets via les mêmes boutons.
@@ -19,7 +19,9 @@ Le projet prend en charge les modes **STORE** (enregistrement) et **RECALL** (ra
 4. **Contrôle ATEM natif** : Changement de Preview et transitions AUTO via protocole UDP natif (sans dépendance PyATEMMax).
 5. **Sauvegarde rapide des presets** : Enregistrez les presets dans un fichier `save.conf` via le bouton 1 (SAVE), qui est chargé automatiquement au démarrage du script.
 6. **Interruption des séquences** : Possibilité d'arrêter une séquence de rappel en cours en appuyant sur le bouton RECALL clignotant.
-7. **Verbose détaillé** : Le script affiche des messages dans la console pour chaque action (enregistrement/rappel de preset, changement de mode, etc.). Les logs incluent aussi la gestion des erreurs (commandes série, configuration).
+7. **Séquence intelligente** : La séquence de rappel s'adapte automatiquement selon que la caméra cible est la même ou différente de celle en Program.
+8. **Initialisation automatique** : Au démarrage, le système force automatiquement le style de transition MIX sur l'ATEM pour garantir des transitions fluides.
+9. **Verbose détaillé** : Le script affiche des messages dans la console pour chaque action (enregistrement/rappel de preset, changement de mode, etc.). Les logs incluent aussi la gestion des erreurs (commandes série, configuration).
 
 ## Aperçu des Modes
 
@@ -85,7 +87,7 @@ Si vous rencontrez des erreurs avec **hidapi**, suivez les étapes ci-dessous po
 
 ### Adresse IP ATEM
 
-Modifier dans `atem.py` (ligne 128) :
+Modifier dans `atem.py` (fonction `connect_to_atem()`) :
 ```python
 switcher.connect('172.18.29.12')  # Remplacer par l'IP de votre ATEM
 ```
@@ -134,23 +136,87 @@ camera_input_map = {
 2. **Mode RECALL** : Rappeler les presets enregistrés. Si un preset n'existe pas, une erreur est loggée.
 3. **Gestion du Tally** : En mode RECALL, le Tally affiche les caméras en **Program** et **Preview** via l'ATEM.
 
-## Séquence de Rappel de Preset
+### Support des 6 caméras
 
-Lorsqu'un preset est rappelé, la séquence suivante est exécutée automatiquement :
+Le système prend en charge **6 caméras** pour l'enregistrement et le rappel des presets :
 
+| Caméra | Adresse VISCA | Input ATEM (défaut) | Rôle |
+|--------|---------------|---------------------|------|
+| CAM 1 | `0x81` | Input 1 | Caméra standard |
+| CAM 2 | `0x82` | Input 2 | Caméra standard |
+| CAM 3 | `0x83` | Input 3 | Caméra standard |
+| CAM 4 | `0x84` | Input 4 | Caméra standard |
+| CAM 5 | `0x85` | Input 5 | Caméra standard |
+| CAM 6 | `0x86` | Input 6 | Caméra de transition (plan large/flou) |
+
+**Note** : La caméra 6 est utilisée par défaut comme caméra de transition avec :
+- **Preset 16** : Plan large (utilisé pour masquer les mouvements)
+- **Preset 15** : Plan flou (position de repos)
+
+Cette configuration peut être modifiée dans `sequences.py` si vous souhaitez utiliser une autre caméra pour les transitions.
+
+## Phase d'initialisation ATEM
+
+Au démarrage, le système exécute une **phase d'initialisation** qui configure automatiquement l'ATEM :
+
+1. **Style de transition** : Force le mode **MIX** sur ME0 (évite les surprises si l'ATEM était en WIPE ou DVE)
+
+Cette phase est extensible pour ajouter d'autres configurations automatiques à l'avenir.
+
+### Messages console à l'initialisation
+
+```
+Connecté à l'ATEM... OK
+
+==================================================
+📋 Phase d'initialisation ATEM
+==================================================
+  Style de transition ME0: WIPE
+  → Passage de WIPE à MIX
+  ✓ Style maintenant: MIX
+==================================================
+✅ Initialisation terminée
+==================================================
+```
+
+## Séquence de Rappel de Preset (Intelligente)
+
+Le système utilise une **séquence intelligente** qui s'adapte automatiquement selon le contexte :
+
+### Cas 1 : Caméra différente de celle en Program (~3 secondes)
+
+Si vous rappelez un preset sur une caméra **différente** de celle actuellement en Program, la transition masque naturellement le mouvement de la caméra. La séquence est donc raccourcie :
+
+```
+1. Rappel du preset sur la caméra cible
+2. Temporisation 1.5s (la caméra se cale)
+3. Passage de la caméra cible en Preview
+4. Transition AUTO (MIX)
+```
+
+**Message console** : `📷 Caméra différente (2 → 4) - Transition directe`
+
+### Cas 2 : Même caméra que celle en Program (~9 secondes)
+
+Si vous rappelez un preset sur la **même caméra** que celle en Program, il faut masquer le mouvement avec un plan de coupe. La séquence complète est utilisée :
+
+```
 1. Rappel preset 16 sur caméra 6 (plan large)
 2. Temporisation 2s
 3. Passage caméra 6 en Preview
-4. Transition AUTO
+4. Transition AUTO (vers plan large)
 5. Rappel preset de la caméra cible
-6. Temporisation 2s
+6. Temporisation 2s (la caméra se cale)
 7. Passage caméra cible en Preview
-8. Transition AUTO
+8. Transition AUTO (vers caméra cible)
 9. Rappel preset 15 sur caméra 6 (plan flou)
+```
+
+**Message console** : `📷 Même caméra (3) - Passage par plan large`
 
 ### Feedback visuel pendant la séquence
 
-Pendant l'exécution de la séquence (~9 secondes) :
+Pendant l'exécution de la séquence :
 
 - **Bouton RECALL (0)** : Effet de pulsation rouge (breathing) indiquant que la séquence est en cours
 - **Interactions bloquées** : Tous les boutons sont désactivés jusqu'à la fin de la séquence
@@ -219,14 +285,21 @@ Exemple de fichier `save.conf` :
 | `streamdeck_XL.py` | Fichier principal, orchestration générale |
 | `streamdeck.py` | Initialisation et gestion des événements Stream Deck |
 | `presets.py` | Gestion des presets (enregistrement, rappel, sauvegarde) |
-| `sequences.py` | Séquences de rappel avec contrôle ATEM et système d'interruption |
+| `sequences.py` | Séquences de rappel intelligentes avec logique conditionnelle |
 | `camera.py` | Commandes série VISCA |
 | `tally.py` | Affichage Tally (Program/Preview) |
-| `atem.py` | Interface ATEM (wrapper compatible PyATEMMax) |
+| `atem.py` | Interface ATEM (wrapper compatible PyATEMMax) + initialisation |
 | `atem_client.py` | Client ATEM UDP natif |
 | `display.py` | Création des images pour les boutons |
 
 > 📘 Pour les détails techniques de `atem_client.py` et du protocole ATEM, voir [readme_technique.md](readme_technique.md).
+
+### Versions alternatives
+
+| Fichier | Description |
+|---------|-------------|
+| `sequences.py` | **Version principale** - Séquence intelligente (courte ou complète selon le contexte) |
+| `sequences_legacy.py` | Version legacy - Toujours la séquence complète de 9 étapes |
 
 ### Relations entre les fichiers
 
@@ -234,8 +307,8 @@ Exemple de fichier `save.conf` :
 streamdeck_XL.py (main)
     ├── streamdeck.py      → Initialisation et événements Stream Deck
     ├── presets.py         → Logique des presets (lance séquences en thread)
-    │   ├── sequences.py   → Séquences de rappel avec ATEM + interruption
-    │   │   └── atem.py    → Interface ATEM
+    │   ├── sequences.py   → Séquences intelligentes + interruption
+    │   │   └── atem.py    → Interface ATEM + initialisation
     │   │       └── atem_client.py  → Client UDP natif
     │   └── camera.py      → Commandes VISCA série
     ├── tally.py           → Affichage Program/Preview
@@ -251,10 +324,11 @@ streamdeck_XL.py (main)
 ├── 📜 streamdeck_XL.py         # Fichier principal du script
 ├── 📜 streamdeck.py            # Gestion du Stream Deck
 ├── 📜 presets.py               # Gestion des presets (enregistrement, rappel, sauvegarde)
-├── 📜 sequences.py             # Gestion des séquences avec contrôle ATEM
+├── 📜 sequences.py             # Séquences intelligentes (version principale)
+├── 📜 sequences_legacy.py      # Séquences complètes (version legacy)
 ├── 📜 camera.py                # Commandes série VISCA
 ├── 📜 tally.py                 # Intégration Tally via ATEM
-├── 📜 atem.py                  # Interface ATEM (wrapper)
+├── 📜 atem.py                  # Interface ATEM (wrapper) + initialisation
 ├── 📜 atem_client.py           # Client ATEM UDP natif
 ├── 📜 display.py               # Création des images pour les boutons
 ├── 📜 readme.md                # Ce fichier
@@ -288,6 +362,11 @@ streamdeck_XL.py (main)
 1. Vérifier que vous appuyez bien sur le bouton 0 (RECALL) pendant le clignotement
 2. L'arrêt peut prendre jusqu'à 100ms pour être effectif
 3. Vérifier les messages dans la console (`🛑 Séquence interrompue...`)
+
+### La transition n'est pas en MIX
+
+1. Vérifier les logs d'initialisation (doit afficher "Style maintenant: MIX")
+2. Si le problème persiste, activer `ENSURE_MIX_TRANSITION = True` dans `sequences.py`
 
 ### Erreur "No module named PIL"
 

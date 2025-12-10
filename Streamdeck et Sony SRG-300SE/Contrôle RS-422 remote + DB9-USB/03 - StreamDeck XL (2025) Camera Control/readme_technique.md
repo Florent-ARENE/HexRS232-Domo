@@ -12,13 +12,16 @@ Ce document détaille le protocole de communication UDP utilisé par les switche
 2. [Format des paquets](#format-des-paquets)
 3. [Handshake de connexion](#handshake-de-connexion)
 4. [Commandes ATEM](#commandes-atem)
-5. [atem_client.py - Implémentation](#atem_clientpy---implémentation)
-6. [atem.py - Wrapper PyATEMMax](#atempy---wrapper-pyatemmax)
-7. [Configuration des caméras](#configuration-des-caméras)
-8. [Système de feedback visuel](#système-de-feedback-visuel-sequencespy)
-9. [Système d'interruption des séquences](#système-dinterruption-des-séquences)
-10. [Historique des découvertes](#historique-des-découvertes)
-11. [Référence des commandes](#référence-des-commandes)
+5. [Style de transition (MIX/WIPE)](#style-de-transition-mixwipe)
+6. [Phase d'initialisation](#phase-dinitialisation)
+7. [atem_client.py - Implémentation](#atem_clientpy---implémentation)
+8. [atem.py - Wrapper PyATEMMax](#atempy---wrapper-pyatemmax)
+9. [Configuration des caméras](#configuration-des-caméras)
+10. [Système de feedback visuel](#système-de-feedback-visuel-sequencespy)
+11. [Système d'interruption des séquences](#système-dinterruption-des-séquences)
+12. [Séquence intelligente](#séquence-intelligente)
+13. [Historique des découvertes](#historique-des-découvertes)
+14. [Référence des commandes](#référence-des-commandes)
 
 ---
 
@@ -294,6 +297,213 @@ Offset  Taille  Description
 
 ---
 
+## Style de transition (MIX/WIPE)
+
+### Vue d'ensemble
+
+Le système gère automatiquement le style de transition pour garantir des transitions fluides en **MIX**. Cette fonctionnalité évite les surprises si l'ATEM était configuré en WIPE, DVE ou autre style.
+
+### Commandes utilisées
+
+#### TrSS - Transition Style/Selection (réception)
+
+L'ATEM envoie cette commande pour notifier le style de transition actuel.
+
+**Format du payload** :
+```
+Offset  Taille  Description
+------  ------  ------------------------------------------
+0       1       ME index (0 = ME1)
+1       1       Style de transition
+                  0 = MIX
+                  1 = DIP
+                  2 = WIPE
+                  3 = DVE
+                  4 = STING
+2+      var     Autres données (keyers, etc.)
+```
+
+#### CTTp - Change Transition Type (envoi)
+
+Cette commande permet de changer le style de transition.
+
+**Format du payload** (4 bytes) :
+```
+Offset  Taille  Description
+------  ------  ------------------------------------------
+0       1       Mask (0x01 = changer le style)
+1       1       ME index (0 = ME1)
+2       1       Style de transition (0-4)
+3       1       Padding (0x00)
+```
+
+**Exemple - Forcer MIX sur ME1** :
+```
+Command: "CTTp"
+Payload: 01 00 00 00
+         │  │  │  └── Padding
+         │  │  └───── Style = 0 (MIX)
+         │  └──────── ME = 0
+         └─────────── Mask = 0x01 (changer style)
+```
+
+### Constantes de style
+
+| Valeur | Constante | Description |
+|--------|-----------|-------------|
+| 0 | `TRANSITION_MIX` | Fondu enchaîné |
+| 1 | `TRANSITION_DIP` | Fondu via couleur |
+| 2 | `TRANSITION_WIPE` | Volet (horizontal, vertical, etc.) |
+| 3 | `TRANSITION_DVE` | Effet vidéo numérique (push, squeeze) |
+| 4 | `TRANSITION_STING` | Transition avec media |
+
+### API Python
+
+#### atem_client.py
+
+```python
+from atem_client import ATEMClient, TRANSITION_MIX, TRANSITION_WIPE
+
+atem = ATEMClient("172.18.29.12")
+atem.connect()
+
+# Lire le style actuel
+style = atem.get_transition_style(0)  # ME0
+print(f"Style: {style}")  # 0, 1, 2, 3 ou 4
+
+# Changer le style
+atem.set_transition_style(0, TRANSITION_MIX)
+
+# Vérifier/forcer MIX (méthode recommandée)
+atem.ensure_mix_transition(0)
+```
+
+#### atem.py (wrapper)
+
+```python
+from atem import switcher, STYLE_MIX, STYLE_WIPE
+
+# Lire le style actuel
+style = switcher.getTransitionStyle(0)
+style_name = switcher.getTransitionStyleName(0)  # "MIX", "WIPE", etc.
+
+# Changer le style (plusieurs formats acceptés)
+switcher.setTransitionStyle(0, STYLE_MIX)      # Par constante
+switcher.setTransitionStyle(0, 0)              # Par valeur
+switcher.setTransitionStyle(0, "mix")          # Par nom (string)
+
+# Vérifier/forcer MIX automatiquement
+switcher.ensureMixTransition(0)  # Retourne True si OK
+```
+
+---
+
+## Phase d'initialisation
+
+### Vue d'ensemble
+
+À la connexion ATEM, le système exécute une **phase d'initialisation** qui configure automatiquement certains paramètres. Cette architecture est extensible pour ajouter facilement de nouvelles initialisations.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  connect_to_atem()                                      │
+│  ├─ Connexion UDP                                       │
+│  ├─ Attente handshake                                   │
+│  └─ Phase d'initialisation                              │
+│      ├─ _init_transition_style()  ← Force MIX          │
+│      ├─ _init_xxx()               ← Futures init       │
+│      └─ _init_yyy()               ← Futures init       │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Fonction _init_transition_style()
+
+```python
+def _init_transition_style():
+    """
+    Initialisation du style de transition.
+    Force le mode MIX sur ME0 si nécessaire.
+    """
+    import time
+    
+    # Petite pause pour s'assurer que tous les états ont été reçus
+    time.sleep(0.3)
+    
+    style = switcher.getTransitionStyle(0)
+    style_name = switcher.getTransitionStyleName(0)
+    
+    print(f"  Style de transition ME0: {style_name}")
+    
+    if style is None:
+        print("  ⚠️ Style non reçu, forçage MIX par précaution")
+        switcher.setTransitionStyle(0, STYLE_MIX)
+        time.sleep(0.2)
+    elif style != STYLE_MIX:
+        print(f"  → Passage de {style_name} à MIX")
+        switcher.setTransitionStyle(0, STYLE_MIX)
+        time.sleep(0.2)
+        new_style_name = switcher.getTransitionStyleName(0)
+        print(f"  ✓ Style maintenant: {new_style_name}")
+    else:
+        print("  ✓ Déjà en MIX, aucun changement nécessaire")
+```
+
+### Messages console attendus
+
+**Si changement nécessaire :**
+```
+Connecté à l'ATEM... OK
+
+==================================================
+📋 Phase d'initialisation ATEM
+==================================================
+  Style de transition ME0: WIPE
+  → Passage de WIPE à MIX
+[ATEM] Définition style transition ME0: MIX
+[ATEM] Transition style ME0: MIX
+  ✓ Style maintenant: MIX
+==================================================
+✅ Initialisation terminée
+==================================================
+```
+
+**Si déjà en MIX :**
+```
+==================================================
+📋 Phase d'initialisation ATEM
+==================================================
+  Style de transition ME0: MIX
+  ✓ Déjà en MIX, aucun changement nécessaire
+==================================================
+✅ Initialisation terminée
+==================================================
+```
+
+### Ajouter une nouvelle initialisation
+
+Pour ajouter une nouvelle initialisation, créer une fonction `_init_xxx()` et l'appeler dans `connect_to_atem()` :
+
+```python
+def _init_xxx():
+    """Nouvelle initialisation"""
+    print("  Configuration de XXX...")
+    # ... code d'initialisation ...
+    print("  ✓ XXX configuré")
+
+def connect_to_atem():
+    # ... connexion ...
+    
+    # Phase d'initialisation
+    _init_transition_style()
+    _init_xxx()  # Ajouter ici
+    
+    # ... suite ...
+```
+
+---
+
 ## atem_client.py - Implémentation
 
 ### Vue d'ensemble
@@ -311,6 +521,7 @@ Offset  Taille  Description
 │    - session_id, local_seq, highest_remote              │
 │    - program: {ME: source}                              │
 │    - preview: {ME: source}                              │
+│    - transition_style: {ME: style}                      │
 │    - connected: bool                                    │
 ├─────────────────────────────────────────────────────────┤
 │  Méthodes publiques:                                    │
@@ -318,8 +529,11 @@ Offset  Taille  Description
 │    - disconnect()                                       │
 │    - get_program(me) -> int                             │
 │    - get_preview(me) -> int                             │
+│    - get_transition_style(me) -> int                    │
 │    - set_preview_input(me, source)                      │
 │    - set_program_input(me, source)                      │
+│    - set_transition_style(me, style)                    │
+│    - ensure_mix_transition(me) -> bool                  │
 │    - do_auto(me)                                        │
 │    - do_cut(me)                                         │
 ├─────────────────────────────────────────────────────────┤
@@ -354,7 +568,7 @@ client.disconnect()
 Un thread daemon tourne en arrière-plan pour :
 - Recevoir les paquets de l'ATEM
 - Envoyer les ACK automatiquement
-- Mettre à jour l'état (program, preview)
+- Mettre à jour l'état (program, preview, transition_style)
 
 ```python
 def _recv_loop(self):
@@ -418,6 +632,10 @@ preview = switcher.previewInput[0].videoSource  # "input1"
 # Commandes (comme PyATEMMax)
 switcher.setPreviewInputVideoSource(0, "input2")
 switcher.execAutoME(0)
+
+# Nouvelles méthodes (style de transition)
+switcher.setTransitionStyle(0, "mix")
+switcher.ensureMixTransition(0)
 ```
 
 ### Classes d'émulation
@@ -457,6 +675,9 @@ class ATEMWrapper:
 | `switcher.setPreviewInputVideoSource(me, src)` | Émulé | `set_preview_input(me, src)` |
 | `switcher.execAutoME(me)` | Émulé | `do_auto(me)` |
 | `switcher.execCutME(me)` | Émulé | `do_cut(me)` |
+| - | `setTransitionStyle(me, style)` | `set_transition_style(me, style)` |
+| - | `getTransitionStyle(me)` | `get_transition_style(me)` |
+| - | `ensureMixTransition(me)` | `ensure_mix_transition(me)` |
 
 ---
 
@@ -464,7 +685,22 @@ class ATEMWrapper:
 
 ### Vue d'ensemble
 
-Le projet est configuré par défaut pour **6 caméras**. Cette section explique comment adapter la configuration selon votre installation.
+Le projet est configuré par défaut pour **6 caméras** avec support complet de l'enregistrement et du rappel des presets pour chacune d'elles. Cette section explique comment adapter la configuration selon votre installation.
+
+### Architecture 6 caméras
+
+| Caméra | Adresse VISCA | Input ATEM | Bouton Stream Deck | Rôle |
+|--------|---------------|------------|-------------------|------|
+| CAM 1 | `0x81` | Input 1 | Bouton 3 | Caméra standard |
+| CAM 2 | `0x82` | Input 2 | Bouton 4 | Caméra standard |
+| CAM 3 | `0x83` | Input 3 | Bouton 5 | Caméra standard |
+| CAM 4 | `0x84` | Input 4 | Bouton 6 | Caméra standard |
+| CAM 5 | `0x85` | Input 5 | Bouton 7 | Caméra standard |
+| CAM 6 | `0x86` | Input 6 | - | Caméra de transition |
+
+**Caméra de transition (CAM 6)** : Par défaut, la caméra 6 est dédiée aux plans de coupe avec :
+- **Preset 16** : Plan large pour masquer les mouvements des autres caméras
+- **Preset 15** : Plan flou comme position de repos entre les séquences
 
 ### Fichiers à modifier
 
@@ -477,12 +713,12 @@ Le projet est configuré par défaut pour **6 caméras**. Cette section explique
 
 ### 1. Nombre de caméras (presets.py)
 
-Le dictionnaire définit combien de caméras peuvent enregistrer des presets :
+Le système supporte l'enregistrement et le rappel de presets pour **6 caméras** par défaut. Le dictionnaire `camera_preset_count` définit combien de caméras peuvent enregistrer des presets :
 
 ```python
-# Pour 6 caméras (défaut)
+# Pour 6 caméras (configuration par défaut)
 camera_preset_count = {i: 1 for i in range(1, 7)}  # Caméras 1 à 6
-camera_presets = {i: [] for i in range(1, 7)}
+camera_presets = {i: [] for i in range(1, 7)}      # Liste des presets par caméra
 
 # Pour 4 caméras
 camera_preset_count = {i: 1 for i in range(1, 5)}  # Caméras 1 à 4
@@ -493,7 +729,7 @@ camera_preset_count = {i: 1 for i in range(1, 9)}  # Caméras 1 à 8
 camera_presets = {i: [] for i in range(1, 9)}
 ```
 
-**Important** : Modifier aussi dans `load_configuration()` du même fichier.
+**Important** : Modifier aussi dans `load_configuration()` du même fichier pour que le chargement de la configuration soit cohérent.
 
 ### 2. Mapping Caméras ↔ Inputs ATEM (tally.py)
 
@@ -868,6 +1104,156 @@ def streamdeck_callback(deck, key, state):
 
 ---
 
+## Séquence intelligente
+
+### Vue d'ensemble
+
+La version principale de `sequences.py` utilise une **séquence intelligente** qui s'adapte automatiquement selon que la caméra cible est la même ou différente de celle actuellement en Program.
+
+### Logique de décision
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  sequence_actions(camera_number, preset_number, deck)   │
+├─────────────────────────────────────────────────────────┤
+│  1. Récupérer la caméra actuellement en Program         │
+│  2. Comparer avec la caméra cible                       │
+│                                                         │
+│  SI caméra cible ≠ caméra Program:                      │
+│     → Séquence COURTE (transition directe, ~3s)         │
+│                                                         │
+│  SI caméra cible = caméra Program:                      │
+│     → Séquence COMPLÈTE (plan de coupe, ~9s)            │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Fonction get_program_camera()
+
+```python
+def get_program_camera():
+    """
+    Récupère le numéro de caméra actuellement en Program.
+    
+    Returns:
+        Numéro de caméra (1-6) ou None si non trouvé
+    """
+    try:
+        program_input = switcher.programInput[0].videoSource  # ex: "input3"
+        if program_input is None:
+            return None
+        input_number = int(program_input.replace('input', ''))  # ex: 3
+        # Trouver la caméra correspondante dans camera_input_map
+        for camera, atem_input in camera_input_map.items():
+            if atem_input == input_number:
+                return camera
+        return None
+    except Exception as e:
+        print(f"Erreur lors de la récupération de la caméra Program: {e}")
+        return None
+```
+
+### Séquence COURTE (caméra différente) - ~3 secondes
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  📷 Caméra différente (2 → 4) - Transition directe      │
+├─────────────────────────────────────────────────────────┤
+│  [Étape 1/4] Rappel preset caméra cible                 │
+│  [Étape 2/4] Temporisation 1.5s (calage caméra)         │
+│  [Étape 3/4] Caméra cible en Preview                    │
+│  [Étape 4/4] Transition AUTO (MIX)                      │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Avantage** : La transition elle-même masque le mouvement de la caméra, pas besoin de plan de coupe.
+
+### Séquence COMPLÈTE (même caméra) - ~9 secondes
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  📷 Même caméra (3) - Passage par plan large            │
+├─────────────────────────────────────────────────────────┤
+│  [Étape 1/9] Rappel preset 16 caméra 6 (plan large)     │
+│  [Étape 2/9] Temporisation 2s                           │
+│  [Étape 3/9] Caméra 6 en Preview                        │
+│  [Étape 4/9] Transition AUTO vers plan large            │
+│  [Étape 5/9] Rappel preset caméra cible                 │
+│  [Étape 6/9] Temporisation 2s (calage caméra)           │
+│  [Étape 7/9] Caméra cible en Preview                    │
+│  [Étape 8/9] Transition AUTO vers caméra cible          │
+│  [Étape 9/9] Rappel preset 15 caméra 6 (plan flou)      │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Nécessité** : Le spectateur voit la même caméra, il faut masquer le mouvement avec un plan de coupe.
+
+### Messages console
+
+**Caméra différente :**
+```
+==================================================
+🎬 Début de la séquence de transition
+==================================================
+📷 Caméra différente (2 → 4) - Transition directe
+
+[Étape 1/4] Rappel preset 3 caméra 4
+Rappel du preset 3 pour la caméra 4
+Envoi de la commande : 8401043f0202ff
+
+[Étape 2/4] Temporisation 1.5s (calage caméra)...
+
+[Étape 3/4] Caméra 4 en Preview
+Passage de la caméra 4 (input input4) en Preview
+
+[Étape 4/4] Transition AUTO vers caméra 4
+Lancement de la transition AUTO
+Transition AUTO effectuée avec succès
+
+==================================================
+✅ Séquence terminée avec succès
+==================================================
+```
+
+**Même caméra :**
+```
+==================================================
+🎬 Début de la séquence de transition
+==================================================
+📷 Même caméra (3) - Passage par plan large
+
+[Étape 1/9] Rappel preset 16 caméra 6 (plan large)
+...
+[Étape 9/9] Rappel preset 15 caméra 6 (plan flou)
+
+==================================================
+✅ Séquence terminée avec succès
+==================================================
+```
+
+### Version legacy
+
+Si vous préférez toujours utiliser la séquence complète de 9 étapes, renommez les fichiers :
+
+```bash
+# Sauvegarder la version intelligente
+mv sequences.py sequences_smart.py
+
+# Utiliser la version legacy
+mv sequences_legacy.py sequences.py
+```
+
+### Configuration optionnelle
+
+Une vérification supplémentaire du style MIX peut être activée dans `sequences.py` si quelqu'un change le style pendant l'utilisation :
+
+```python
+# Au début de sequences.py
+ENSURE_MIX_TRANSITION = False  # Par défaut: géré à l'init
+ENSURE_MIX_TRANSITION = True   # Active une vérification supplémentaire par séquence
+```
+
+---
+
 ## Historique des découvertes
 
 ### Problème initial
@@ -947,6 +1333,22 @@ Solution:
 - Implémenter un système d'interruption avec flag et sleep interruptible
 ```
 
+### Découverte #5 : Style de transition
+
+```
+Observation:
+- Les transitions n'étaient pas toujours fluides
+- Parfois des WIPE inattendus apparaissaient
+
+Cause:
+- L'ATEM conserve le dernier style de transition utilisé
+- Quelqu'un avait pu le changer manuellement
+
+Solution:
+- Forcer le style MIX à l'initialisation
+- Utiliser la commande CTTp avec le format [0x01, ME, style, 0x00]
+```
+
 ---
 
 ## Référence des commandes
@@ -959,6 +1361,7 @@ Solution:
 | `CPgI` | Change Program Input | `[ME, 0x00, src_hi, src_lo]` |
 | `DAut` | Do Auto Transition | `[ME, 0x00, 0x00, 0x00]` |
 | `DCut` | Do Cut | `[ME, 0x00, 0x00, 0x00]` |
+| `CTTp` | Change Transition Type | `[0x01, ME, style, 0x00]` |
 
 ### Commandes de réception (ATEM → Client)
 
@@ -966,6 +1369,7 @@ Solution:
 |----------|-------------|---------|
 | `PrgI` | Program Input | `[ME, ??, src_hi, src_lo]` |
 | `PrvI` | Preview Input | `[ME, ??, src_hi, src_lo, ...]` |
+| `TrSS` | Transition Style/Selection | `[ME, style, ...]` |
 | `InCm` | Init Complete | Marqueur de fin d'initialisation |
 | `TlIn` | Tally Input | État tally des sources |
 
@@ -982,6 +1386,16 @@ Solution:
 | 6000 | Super Source |
 | 10010 | ME 1 Program |
 | 10011 | ME 1 Preview |
+
+### Styles de transition
+
+| Valeur | Style |
+|--------|-------|
+| 0 | MIX |
+| 1 | DIP |
+| 2 | WIPE |
+| 3 | DVE |
+| 4 | STING |
 
 ---
 

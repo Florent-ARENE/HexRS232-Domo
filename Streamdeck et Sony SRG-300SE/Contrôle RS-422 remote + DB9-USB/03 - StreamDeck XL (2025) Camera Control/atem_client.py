@@ -1,12 +1,29 @@
 #!/usr/bin/env python3
 """
-ATEM Client - Version fonctionnelle
+ATEM Client - Version avec gestion du style de transition
 Format CPvI validé : [ME, 0x00, source_hi, source_lo] (sans mask byte)
+Ajout : CTTp pour forcer MIX avant les transitions
 """
 
 import socket
 import time
 import threading
+
+# Constantes pour les styles de transition
+TRANSITION_MIX = 0
+TRANSITION_DIP = 1
+TRANSITION_WIPE = 2
+TRANSITION_DVE = 3
+TRANSITION_STING = 4
+
+TRANSITION_NAMES = {
+    0: "MIX",
+    1: "DIP",
+    2: "WIPE",
+    3: "DVE",
+    4: "STING"
+}
+
 
 class ATEMClient:
     def __init__(self, ip, port=9910):
@@ -18,6 +35,7 @@ class ATEMClient:
         self.highest_remote = 0
         self.program = {}  # {ME: source}
         self.preview = {}  # {ME: source}
+        self.transition_style = {}  # {ME: style} - 0=MIX, 1=DIP, 2=WIPE, 3=DVE, 4=STING
         self.connected = False
         self._running = False
         self._recv_thread = None
@@ -115,6 +133,19 @@ class ATEMClient:
                 source = (payload[2] << 8) | payload[3]
                 with self._lock:
                     self.preview[me] = source
+            
+            elif cmd_name == "TrSS" and len(payload) >= 2:
+                # Transition Style/Selection
+                # Byte 0: ME index
+                # Byte 1: Style (0=MIX, 1=DIP, 2=WIPE, 3=DVE, 4=STING)
+                me = payload[0]
+                style = payload[1]
+                with self._lock:
+                    old_style = self.transition_style.get(me)
+                    self.transition_style[me] = style
+                    if old_style != style:
+                        style_name = TRANSITION_NAMES.get(style, f"Unknown({style})")
+                        print(f"[ATEM] Transition style ME{me}: {style_name}")
             
             offset += cmd_len
     
@@ -214,6 +245,74 @@ class ATEMClient:
         ]
         return self._send_command("CPgI", payload)
     
+    def set_transition_style(self, me, style):
+        """Définir le style de transition d'un ME
+        
+        Args:
+            me: M/E index (0 pour ME1)
+            style: 0=MIX, 1=DIP, 2=WIPE, 3=DVE, 4=STING
+        
+        Returns:
+            True si la commande a été envoyée
+        """
+        if style < 0 or style > 4:
+            print(f"[ATEM] Style de transition invalide: {style}")
+            return False
+        
+        # Format CTTp : [mask, 0x00, style, 0x02]
+        # Le mask 0x01 indique qu'on change le style
+        # Le dernier byte 0x02 est un flag de confirmation/ME
+        payload = [
+            0x01,           # Mask: on change le style
+            me & 0xFF,      # ME index
+            style & 0xFF,   # Style de transition
+            0x00            # Padding
+        ]
+        
+        style_name = TRANSITION_NAMES.get(style, f"Unknown({style})")
+        print(f"[ATEM] Définition style transition ME{me}: {style_name}")
+        
+        return self._send_command("CTTp", payload)
+    
+    def get_transition_style(self, me=0):
+        """Obtenir le style de transition actuel d'un ME
+        
+        Args:
+            me: M/E index (0 pour ME1)
+        
+        Returns:
+            Style (0=MIX, 1=DIP, 2=WIPE, 3=DVE, 4=STING) ou None si inconnu
+        """
+        with self._lock:
+            return self.transition_style.get(me)
+    
+    def ensure_mix_transition(self, me=0):
+        """S'assurer que le style de transition est MIX
+        
+        Args:
+            me: M/E index (0 pour ME1)
+        
+        Returns:
+            True si déjà en MIX ou si la commande a été envoyée
+        """
+        current_style = self.get_transition_style(me)
+        
+        if current_style is None:
+            print(f"[ATEM] Style de transition ME{me} inconnu, forçage MIX")
+            self.set_transition_style(me, TRANSITION_MIX)
+            time.sleep(0.1)  # Attendre la confirmation
+            return True
+        
+        if current_style == TRANSITION_MIX:
+            print(f"[ATEM] Transition ME{me} déjà en MIX ✓")
+            return True
+        
+        style_name = TRANSITION_NAMES.get(current_style, f"Unknown({current_style})")
+        print(f"[ATEM] Transition ME{me} en {style_name}, passage en MIX")
+        self.set_transition_style(me, TRANSITION_MIX)
+        time.sleep(0.1)  # Attendre la confirmation
+        return True
+    
     def do_auto(self, me=0):
         """Exécuter une transition AUTO
         
@@ -255,7 +354,7 @@ class ATEMClient:
 # Test
 if __name__ == "__main__":
     print("=" * 70)
-    print(" Test ATEM Client")
+    print(" Test ATEM Client avec gestion du style de transition")
     print("=" * 70)
     
     atem = ATEMClient("172.18.29.12")
@@ -269,11 +368,29 @@ if __name__ == "__main__":
     print(f"    Program ME0: {atem.get_program(0)}")
     print(f"    Preview ME0: {atem.get_preview(0)}")
     
-    # Test Preview
+    # Afficher le style de transition actuel
+    current_style = atem.get_transition_style(0)
+    if current_style is not None:
+        style_name = TRANSITION_NAMES.get(current_style, f"Unknown({current_style})")
+        print(f"    Transition style ME0: {style_name}")
+    else:
+        print("    Transition style ME0: Non reçu")
+    
+    # Test: forcer MIX
+    print(f"\n[2] Test ensure_mix_transition...")
+    atem.ensure_mix_transition(0)
+    time.sleep(0.5)
+    
+    current_style = atem.get_transition_style(0)
+    if current_style is not None:
+        style_name = TRANSITION_NAMES.get(current_style, f"Unknown({current_style})")
+        print(f"    Transition style ME0 après: {style_name}")
+    
+    # Test Preview + AUTO
     current_preview = atem.get_preview(0)
     new_preview = 2 if current_preview != 2 else 3
     
-    print(f"\n[2] Test CPvI: Preview {current_preview} → {new_preview}")
+    print(f"\n[3] Test CPvI: Preview {current_preview} → {new_preview}")
     atem.set_preview_input(0, new_preview)
     time.sleep(0.5)
     
@@ -284,7 +401,7 @@ if __name__ == "__main__":
         print("    ✓ CPvI fonctionne!")
         
         # Test AUTO
-        print(f"\n[3] Test AUTO transition...")
+        print(f"\n[4] Test AUTO transition (en MIX)...")
         print(f"    Program: {atem.get_program(0)}, Preview: {atem.get_preview(0)}")
         atem.do_auto(0)
         time.sleep(2)
@@ -293,7 +410,7 @@ if __name__ == "__main__":
     else:
         print(f"    ✗ Preview non changée")
     
-    print("\n[4] Déconnexion...")
+    print("\n[5] Déconnexion...")
     atem.disconnect()
     print("    Terminé.")
     
